@@ -1,22 +1,23 @@
+---
 meta:
   environment: node
   toolchain:
     name: npm
-    version: "22"
+    version: 22
 build:
   skip: false
   commands:
-    - npm ci
-    - npm run build
+  - npm ci
+  - npm run build
   artifacts:
-    - dist
-    - node_modules
-    - package.json
+  - dist
+  - node_modules
+  - package.json
 run:
-  scriptName: 
+  persistenceMount: /data
+  scriptName: null
   scriptArguments: null
   nodeArguments: null
   command: node start
-  persistenceMount: /data
-  containerPort: "80"
-  servicePort: "80"
+  containerPort: 80
+  servicePort: 80
