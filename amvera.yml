@@ -5,18 +5,14 @@ meta:
     version: "22"
 build:
   skip: false
-  commands:
-    - npm ci
-    - npm run build
+  additionalCommands: npm run build
   artifacts:
-    - dist
-    - node_modules
-    - package.json
+    "*": /
 run:
   scriptName: 
   scriptArguments: null
   nodeArguments: null
-  command: node start
+  command: npm start
   persistenceMount: /data
   containerPort: "80"
   servicePort: "80"
