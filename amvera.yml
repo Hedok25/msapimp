@@ -6,7 +6,7 @@ meta:
     version: 22
 build:
   skip: false
-  additionalCommands: null
+  additionalCommands: npm run build
   artifacts:
     '*': /
 run:
