@@ -13,10 +13,10 @@ build:
     - node_modules
     - package.json
 run:
-  scriptName: dist/server.js
+  scriptName: 
   scriptArguments: null
   nodeArguments: null
-  command: node dist/server.js
+  command: node start
   persistenceMount: /data
   containerPort: "80"
   servicePort: "80"
