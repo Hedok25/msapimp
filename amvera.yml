@@ -11,9 +11,9 @@ build:
     '*': /
 run:
   persistenceMount: /data
-  scriptName: server.js
+  scriptName: ""
   scriptArguments: null
   nodeArguments: null
-  command: null
+  command: npm run start
   containerPort: 80
   servicePort: 80
