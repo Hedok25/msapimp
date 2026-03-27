@@ -1,0 +1,56 @@
+{
+  "name": "mp-proxy-service",
+  "version": "1.0.0",
+  "description": "Прокси-сервис для маршрутизации запросов к API маркетплейсов",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "db:studio": "npx tsx src/db/studio.ts"
+  },
+  "keywords": [
+    "proxy",
+    "marketplace",
+    "ozon",
+    "wildberries",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@adminjs/fastify": "^4.2.0",
+    "@adminjs/sql": "^2.0.0",
+    "@fastify/formbody": "^8.0.2",
+    "@fastify/helmet": "^12.0.1",
+    "@fastify/jwt": "^9.1.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/swagger": "^9.7.0",
+    "@fastify/swagger-ui": "^5.2.5",
+    "adminjs": "^7.8.0",
+    "bcrypt": "^5.1.1",
+    "better-sqlite3": "^11.6.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^5.8.4",
+    "pino": "^9.5.0",
+    "pino-pretty": "^13.0.0",
+    "uuid": "^11.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.19.15",
+    "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "eslint": "^9.15.0",
+    "prettier": "^3.4.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

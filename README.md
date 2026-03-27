@@ -531,7 +531,7 @@ Admin Panel:
 
 ### Этап 1: Ядро (1-2 недели)
 - [ ] Базовая структура проекта (TypeScript + ESLint + Prettier)
-- [ ] SQLite инициализация + базовые таблицы (Drizzle ORM)
+- [ ] SQLite инициализация + базовые таблицы
 - [ ] JWT аутентификация (login, refresh, middleware)
 - [ ] Path-based routing (1 маркетплейс, например Ozon)
 - [ ] Простая очередь (in-memory, без persistence)
@@ -675,7 +675,6 @@ services:
 | **Тесты** | Fixture-модуль для Mock-MP | ✅ |
 | **Swagger** | @fastify/swagger + OpenAPI annotations | ✅ |
 | **Конфиг** | marketplaces.json + watcher (SIGHUP) | ✅ |
-| **Миграции** | Drizzle ORM с миграциями | ✅ |
 | **Таймауты** | 10 сек по умолчанию, override через опции | ✅ |
 | **Файлы** | Stream-proxy до 50 МБ | ✅ |
 | **Лимит тела** | 5 МБ по умолчанию | ✅ |

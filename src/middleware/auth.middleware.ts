@@ -1,0 +1,72 @@
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { authService } from '../services/auth.service.js';
+import config from '../config/index.js';
+import { JwtPayload } from '../types/index.js';
+
+export async function jwtVerifyDecorator(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const authHeader = request.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    reply.code(401).send({ error: 'Unauthorized', message: 'Missing or invalid authorization header' });
+    throw new Error('Unauthorized');
+  }
+
+  const token = authHeader.substring(7);
+
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new Error('Invalid token format');
+    }
+
+    const [base64Header, base64Payload, signature] = parts;
+    
+    // Проверка подписи
+    const crypto = await import('crypto');
+    const expectedSignature = crypto
+      .createHmac('sha256', config.jwt.secret)
+      .update(`${base64Header}.${base64Payload}`)
+      .digest('base64url');
+
+    if (signature !== expectedSignature) {
+      throw new Error('Invalid signature');
+    }
+
+    const payload: JwtPayload = JSON.parse(Buffer.from(base64Payload, 'base64url').toString());
+
+    // Проверка истечения
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp < now) {
+      throw new Error('Token expired');
+    }
+
+    // Проверка blacklist
+    if (authService.isJwtBlacklisted(payload.jti)) {
+      throw new Error('Token revoked');
+    }
+
+    // Проверка issuer и audience
+    if (payload.iss !== config.jwt.issuer || payload.aud !== config.jwt.audience) {
+      throw new Error('Invalid token issuer or audience');
+    }
+
+    (request as any).user = payload;
+  } catch (error) {
+    reply.code(401).send({ error: 'Unauthorized', message: 'Invalid token' });
+    throw new Error('Unauthorized');
+  }
+}
+
+export async function authMiddleware(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  await jwtVerifyDecorator(request, reply);
+}
+
+export async function adminMiddleware(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  await jwtVerifyDecorator(request, reply);
+
+  const req = request as any;
+  if (!req.user || req.user.role !== 'admin') {
+    reply.code(403).send({ error: 'Forbidden', message: 'Admin access required' });
+    throw new Error('Forbidden');
+  }
+}
