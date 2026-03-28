@@ -43,12 +43,13 @@ export async function initDatabase(): Promise<void> {
     )
   `);
 
-  // Таблица refresh токенов
+  // Таблица access токенов (хранение хешей для возможности отзыва)
   database.exec(`
-    CREATE TABLE IF NOT EXISTS refresh_tokens (
+    CREATE TABLE IF NOT EXISTS access_tokens (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       client_id TEXT NOT NULL,
       token_hash TEXT NOT NULL,
+      jti TEXT UNIQUE NOT NULL,
       expires_at DATETIME NOT NULL,
       is_revoked INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -56,7 +57,7 @@ export async function initDatabase(): Promise<void> {
     )
   `);
 
-  // Таблица blacklist для JWT
+  // Таблица blacklist для JWT (резервный механизм)
   database.exec(`
     CREATE TABLE IF NOT EXISTS jwt_blacklist (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -144,24 +145,31 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
     CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);
     CREATE INDEX IF NOT EXISTS idx_logs_client_id ON logs(client_id);
-    CREATE INDEX IF NOT EXISTS idx_refresh_tokens_client_id ON refresh_tokens(client_id);
+    CREATE INDEX IF NOT EXISTS idx_access_tokens_client_id ON access_tokens(client_id);
+    CREATE INDEX IF NOT EXISTS idx_access_tokens_jti ON access_tokens(jti);
     CREATE INDEX IF NOT EXISTS idx_jwt_blacklist_jti ON jwt_blacklist(jti);
     CREATE INDEX IF NOT EXISTS idx_auth_logs_created_at ON auth_logs(created_at);
   `);
 
   // Создаем админа по умолчанию
-  const bcrypt = await import('bcrypt').then(m => m.default);
+  const bcrypt = (await import('bcrypt')).default;
   const adminEmail = config.admin.email;
-  const stmt = database.prepare('SELECT id FROM clients WHERE email = ?');
-  const existing = stmt.get(adminEmail);
+  const adminClientId = 'admin-client';
+
+  // Проверяем существование админа по client_id (уникальный ключ)
+  const stmt = database.prepare('SELECT id FROM clients WHERE client_id = ?');
+  const existing = stmt.get(adminClientId);
 
   if (!existing) {
-    const passwordHash = bcrypt.hashSync(config.admin.password, 10);
+    const passwordHash = await bcrypt.hash(config.admin.password, 10);
     const insert = database.prepare(`
       INSERT INTO clients (client_id, email, password_hash, role, rate_tier)
-      VALUES ('admin-client', ?, ?, 'admin', 'enterprise')
+      VALUES (?, ?, ?, 'admin', 'enterprise')
     `);
-    insert.run(adminEmail, passwordHash);
+    insert.run(adminClientId, adminEmail, passwordHash);
+    console.log('Admin user created:', adminEmail);
+  } else {
+    console.log('Admin user already exists');
   }
 }
 

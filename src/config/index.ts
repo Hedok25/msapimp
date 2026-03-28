@@ -15,8 +15,7 @@ export const config = {
     secret: process.env.JWT_SECRET || 'dev-secret-key',
     issuer: process.env.JWT_ISSUER || 'mp-proxy-service',
     audience: process.env.JWT_AUDIENCE || 'mp-proxy-service',
-    expiresIn: '60m',
-    refreshExpiresIn: '7d'
+    expiresIn: '180d'  // 180 дней
   },
   admin: {
     email: process.env.ADMIN_EMAIL || 'admin@mp-proxy.local',

@@ -20,7 +20,7 @@ export async function jwtVerifyDecorator(request: FastifyRequest, reply: Fastify
     }
 
     const [base64Header, base64Payload, signature] = parts;
-    
+
     // Проверка подписи
     const crypto = await import('crypto');
     const expectedSignature = crypto
@@ -40,8 +40,8 @@ export async function jwtVerifyDecorator(request: FastifyRequest, reply: Fastify
       throw new Error('Token expired');
     }
 
-    // Проверка blacklist
-    if (authService.isJwtBlacklisted(payload.jti)) {
+    // Проверка отзыва токена (по jti в БД)
+    if (authService.isTokenRevoked(payload.jti)) {
       throw new Error('Token revoked');
     }
 

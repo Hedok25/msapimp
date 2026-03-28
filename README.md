@@ -44,8 +44,7 @@
 ## 🔐 2. Аутентификация (JWT)
 
 ### Тип токена:
-- **Access Token**: JWT, TTL 60 минут
-- **Refresh Token**: Хранится в SQLite (хеши), TTL 7-30 дней
+- **Access Token**: JWT, хранится в SQLite (хеши), TTL 180 дней
 
 ### Алгоритм подписи:
 - **Dev**: HS256 (упрощение разработки)
@@ -60,19 +59,18 @@
 | `iat` | number | ✅ | Время выпуска |
 | `exp` | number | ✅ | Время истечения |
 | `jti` | string | ✅ | Уникальный ID токена |
-| `scope` | string[] | ✅ | Права доступа |-отдельно для каждого ендпоинта
+| `scope` | string[] | ✅ | Права доступа (отдельно для каждого endpoint) |
 | `rate_tier` | string | ✅ | Тариф: basic/premium/enterprise |
 | `role` | string | ✅ | client/admin |
 
 ### Endpoints:
-- `POST /auth/login` — получение пары токенов
-- `POST /auth/refresh` — обновление access token
-- `POST /auth/logout` — отзыв refresh token
+- `POST /auth/login` — получение access токена
+- `POST /auth/logout` — отзыв access токена
 - `GET /auth/me` — информация о клиенте
 
 ### Хранение:
-- Refresh tokens: SQLite (таблица `refresh_tokens`, хеши)
-- JWT blacklist: In-Memory + SQLite (отозванные токены)
+- Access tokens: SQLite (таблица `access_tokens`, хеши токенов)
+- Отзыв токенов: через таблицу `access_tokens` (флаг `is_revoked`)
 - Auth logs: SQLite (таблица `auth_logs`, аудит событий)
 
 ### RBAC:
@@ -381,7 +379,7 @@ accepted → processing → completed
 | SQLite (logs) | 7 дней | `timestamp + 7d < NOW` |
 | SQLite (DLQ) | 30 дней | `moved_to_dlq_at + 30d < NOW` |
 | SQLite (jwt_blacklist) | По exp | `expires_at < NOW` |
-| SQLite (refresh_tokens) | 30 дней | `expires_at < NOW` |
+| SQLite (access_tokens) | 180 дней | `expires_at < NOW` |
 
 ### Гарантии:
 - Логирование процесса очистки
@@ -689,10 +687,100 @@ services:
 
 ---
 
-## 🎯 Рекомендация по старту
+## 📡 Реализованные Endpoints
 
-1. **Создать репозиторий** с указанной структурой папок
-2. **Настроить CI/CD** (lint + test) сразу — дисциплина с первого дня
-3. **Начать с Этапа 1** (Ядро) — 1 МП (Ozon), базовая аутентификация, простой роутинг
-4. **Параллельно разработать Mock-MP** — для тестирования без реальных API
-5. **После Этапа 2 запустить k6** — получить метрики для принятия решений о масштабировании
+### Authentication (Аутентификация)
+
+| Метод | Endpoint | Описание | Auth |
+|-------|----------|----------|------|
+| `POST` | `/auth/login` | Получение access токена | ❌ |
+| `POST` | `/auth/logout` | Отзыв access токена | ❌ |
+| `GET` | `/auth/me` | Информация о текущем пользователе | ✅ |
+
+---
+
+### Health & Monitoring (Здоровье и мониторинг)
+
+| Метод | Endpoint | Описание | Auth |
+|-------|----------|----------|------|
+| `GET` | `/health` | Health check (Liveness/Readiness) | ❌ |
+| `GET` | `/api/v1/queue/stats` | Статистика очереди запросов | ✅ |
+| `GET` | `/api/v1/logs` | Просмотр логов с фильтрацией | ✅ |
+| `DELETE` | `/api/v1/logs?before=...` | Очистка логов старше даты | ✅ (admin) |
+
+---
+
+### Proxy (Проксирование)
+
+| Метод | Endpoint | Описание | Auth |
+|-------|----------|----------|------|
+| `ALL` | `/api/v1/proxy/{marketplace}/*` | Проксирование запросов к API маркетплейса | ✅ |
+
+**Параметры:**
+- `marketplace` — ID маркетплейса (ozon, wb, yandex...)
+- Заголовок `X-Proxy-Options` — Base64-encoded JSON с опциями (опционально)
+
+---
+
+### Admin API (Управление)
+
+#### Клиенты
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| `POST` | `/admin/api/clients` | Создать нового клиента |
+| `DELETE` | `/admin/api/clients/:clientId` | Удалить клиента |
+| `PUT` | `/admin/api/clients/:clientId/status` | Изменить статус клиента (is_active) |
+
+#### Access Tokens
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| `POST` | `/admin/api/access_tokens/:id/revoke` | Отозвать токен |
+| `DELETE` | `/admin/api/access_tokens/:id/delete` | Удалить токен (безвозвратно) |
+
+#### Ресурсы (CRUD для всех таблиц)
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| `GET` | `/admin/api/resources` | Список доступных ресурсов |
+| `GET` | `/admin/api/:table` | Получить данные из таблицы (пагинация: limit, offset) |
+| `GET` | `/admin/api/:table/:id` | Получить запись по ID |
+| `PUT` | `/admin/api/:table/:id` | Обновить запись |
+| `DELETE` | `/admin/api/:table/:id` | Удалить запись |
+
+#### Дашборд
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| `GET` | `/admin/api/dashboard` | Статистика сервера (количество записей в таблицах, uptime, память) |
+| `POST` | `/admin/api/logout` | Выход из админки |
+
+---
+
+### Admin UI
+
+| Endpoint | Описание |
+|----------|----------|
+| `/admin/login` | Страница входа в админку |
+| `/admin` | AdminJS панель управления |
+
+---
+
+### Swagger Documentation
+
+| Endpoint | Описание |
+|----------|----------|
+| `/docs` | Swagger UI с полной спецификацией API |
+| `/docs/json` | JSON спецификация OpenAPI |
+
+---
+
+## 🔑 Роли и доступы
+
+| Роль | Доступ |
+|------|--------|
+| `client` | Прокси, свои запросы, DLQ, queue stats, logs |
+| `admin` | Полный доступ ко всем endpoints + Admin UI |
+
+

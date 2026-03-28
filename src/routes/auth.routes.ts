@@ -1,14 +1,14 @@
 import { FastifyInstance } from 'fastify';
-import { loginController, refreshController, logoutController, meController } from '../controllers/auth.controller.js';
+import { loginController, logoutController, meController } from '../controllers/auth.controller.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
-  // POST /auth/login - получение токенов
+  // POST /auth/login - получение токена
   fastify.post(
     '/login',
     {
       schema: {
-        description: 'Получение пары access/refresh токенов',
+        description: 'Получение access токена',
         tags: ['Authentication'],
         body: {
           type: 'object',
@@ -23,7 +23,6 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
             type: 'object',
             properties: {
               access_token: { type: 'string' },
-              refresh_token: { type: 'string' },
               expires_in: { type: 'number' },
               token_type: { type: 'string' }
             }
@@ -34,37 +33,18 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     loginController
   );
 
-  // POST /auth/refresh - обновление access токена
-  fastify.post(
-    '/refresh',
-    {
-      schema: {
-        description: 'Обновление access токена через refresh token',
-        tags: ['Authentication'],
-        body: {
-          type: 'object',
-          required: ['refresh_token'],
-          properties: {
-            refresh_token: { type: 'string', format: 'uuid' }
-          }
-        }
-      }
-    },
-    refreshController
-  );
-
-  // POST /auth/logout - отзыв refresh токена
+  // POST /auth/logout - отзыв токена
   fastify.post(
     '/logout',
     {
       schema: {
-        description: 'Выход из системы (отзыв refresh токена)',
+        description: 'Выход из системы (отзыв access токена)',
         tags: ['Authentication'],
         body: {
           type: 'object',
-          required: ['refresh_token'],
+          required: ['access_token'],
           properties: {
-            refresh_token: { type: 'string', format: 'uuid' }
+            access_token: { type: 'string' }
           }
         }
       }

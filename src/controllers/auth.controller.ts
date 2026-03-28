@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { authService } from '../services/auth.service.js';
-import { loginSchema, refreshTokenSchema } from '../validation/schemas.js';
+import { loginSchema, logoutSchema } from '../validation/schemas.js';
 import { dbLogger } from '../logging/index.js';
 
 export async function loginController(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -8,7 +8,7 @@ export async function loginController(request: FastifyRequest, reply: FastifyRep
     const body = loginSchema.parse(request.body);
     const { email, password } = body;
 
-    const tokens = await authService.login(email, password);
+    const tokenData = await authService.login(email, password);
 
     dbLogger.info('User logged in', {
       clientId: email,
@@ -17,9 +17,8 @@ export async function loginController(request: FastifyRequest, reply: FastifyRep
     });
 
     reply.send({
-      access_token: tokens.accessToken,
-      refresh_token: tokens.refreshToken,
-      expires_in: tokens.expiresIn,
+      access_token: tokenData.accessToken,
+      expires_in: tokenData.expiresIn,
       token_type: 'Bearer'
     });
   } catch (error) {
@@ -35,34 +34,15 @@ export async function loginController(request: FastifyRequest, reply: FastifyRep
   }
 }
 
-export async function refreshController(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  try {
-    const body = refreshTokenSchema.parse(request.body);
-    const tokens = await authService.refreshToken(body.refresh_token);
-
-    reply.send({
-      access_token: tokens.accessToken,
-      refresh_token: tokens.refreshToken,
-      expires_in: tokens.expiresIn,
-      token_type: 'Bearer'
-    });
-  } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === 'Invalid or expired refresh token') {
-        reply.code(401).send({ error: 'Unauthorized', message: 'Invalid or expired refresh token' });
-      } else {
-        reply.code(400).send({ error: 'Bad Request', message: error.message });
-      }
-    } else {
-      reply.code(500).send({ error: 'Internal Server Error' });
-    }
-  }
-}
-
 export async function logoutController(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
-    const body = refreshTokenSchema.parse(request.body);
-    await authService.logout(body.refresh_token);
+    const body = logoutSchema.parse(request.body);
+    await authService.logout(body.access_token);
+
+    dbLogger.info('User logged out', {
+      action: 'logout',
+      metadata: { jti: body.jti }
+    });
 
     reply.send({ message: 'Logged out successfully' });
   } catch (error) {

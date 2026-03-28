@@ -5,8 +5,9 @@ export const loginSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters')
 });
 
-export const refreshTokenSchema = z.object({
-  refresh_token: z.string().uuid('Invalid refresh token format')
+export const logoutSchema = z.object({
+  access_token: z.string().min(1, 'Access token is required'),
+  jti: z.string().optional()
 });
 
 export const proxyOptionsSchema = z.object({
@@ -23,5 +24,5 @@ export const proxyOptionsSchema = z.object({
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
-export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
+export type LogoutInput = z.infer<typeof logoutSchema>;
 export type ProxyOptions = z.infer<typeof proxyOptionsSchema>;

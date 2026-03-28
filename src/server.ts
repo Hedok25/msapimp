@@ -400,22 +400,23 @@ async function buildApp(): Promise<FastifyInstance> {
     }
     
     async function loadTokens() {
-      const res = await fetch('/admin/api/refresh_tokens', {
+      const res = await fetch('/admin/api/access_tokens', {
         headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
       });
       if (!res.ok) { handleAuthError(); return; }
       const data = await res.json();
-      
+
       let html = \`<div class="card">
-        <h3>Refresh Tokens</h3>
+        <h3>Access Tokens</h3>
         <table>
-          <thead><tr><th>ID</th><th>Client ID</th><th>Expires At</th><th>Revoked</th><th>Actions</th></tr></thead>
+          <thead><tr><th>ID</th><th>Email</th><th>JTI</th><th>Expires At</th><th>Revoked</th><th>Actions</th></tr></thead>
           <tbody>\`;
-      
+
       data.data.forEach(row => {
         html += \`<tr>
           <td>\${row.id}</td>
-          <td>\${row.client_id}</td>
+          <td>\${row.email}</td>
+          <td>\${row.jti.substring(0, 8)}...</td>
           <td>\${row.expires_at}</td>
           <td>\${row.is_revoked ? 'Yes' : 'No'}</td>
           <td>
@@ -424,7 +425,7 @@ async function buildApp(): Promise<FastifyInstance> {
           </td>
         </tr>\`;
       });
-      
+
       html += \`</tbody></table></div>\`;
       document.getElementById('tokens').innerHTML = html;
     }
@@ -537,7 +538,7 @@ async function buildApp(): Promise<FastifyInstance> {
       if (!confirm('Are you sure you want to revoke this token?')) return;
 
       try {
-        const res = await fetch('/admin/api/refresh_tokens/' + tokenId + '/revoke', {
+        const res = await fetch('/admin/api/access_tokens/' + tokenId + '/revoke', {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
         });
@@ -554,7 +555,7 @@ async function buildApp(): Promise<FastifyInstance> {
       if (!confirm('Are you sure you want to PERMANENTLY delete this token? This action cannot be undone!')) return;
 
       try {
-        const res = await fetch('/admin/api/refresh_tokens/' + tokenId + '/delete', {
+        const res = await fetch('/admin/api/access_tokens/' + tokenId + '/delete', {
           method: 'DELETE',
           headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
         });
@@ -573,12 +574,12 @@ async function buildApp(): Promise<FastifyInstance> {
     }
     
     async function logout() {
-      const refreshToken = localStorage.getItem('refresh_token');
+      const accessToken = localStorage.getItem('access_token');
       try {
-        await fetch('/admin/api/logout', {
+        await fetch('/auth/logout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: refreshToken })
+          body: JSON.stringify({ access_token: accessToken })
         });
       } catch (e) {}
       localStorage.clear();
@@ -668,28 +669,28 @@ async function buildApp(): Promise<FastifyInstance> {
     });
 
     // API: Отозвать токен
-    fastify.post('/api/refresh_tokens/:id/revoke', { preHandler: [adminMiddleware] }, async (request, reply) => {
+    fastify.post('/api/access_tokens/:id/revoke', { preHandler: [adminMiddleware] }, async (request, reply) => {
       const params = request.params as { id: string };
 
-      const token = db.prepare('SELECT id FROM refresh_tokens WHERE id = ?').get(params.id);
+      const token = db.prepare('SELECT id FROM access_tokens WHERE id = ?').get(params.id);
       if (!token) {
         return reply.code(404).send({ message: 'Token not found' });
       }
 
-      db.prepare('UPDATE refresh_tokens SET is_revoked = 1 WHERE id = ?').run(params.id);
+      db.prepare('UPDATE access_tokens SET is_revoked = 1 WHERE id = ?').run(params.id);
       return { success: true };
     });
 
     // API: Удалить токен (безвозвратно)
-    fastify.delete('/api/refresh_tokens/:id/delete', { preHandler: [adminMiddleware] }, async (request, reply) => {
+    fastify.delete('/api/access_tokens/:id/delete', { preHandler: [adminMiddleware] }, async (request, reply) => {
       const params = request.params as { id: string };
 
-      const token = db.prepare('SELECT id FROM refresh_tokens WHERE id = ?').get(params.id);
+      const token = db.prepare('SELECT id FROM access_tokens WHERE id = ?').get(params.id);
       if (!token) {
         return reply.code(404).send({ message: 'Token not found' });
       }
 
-      db.prepare('DELETE FROM refresh_tokens WHERE id = ?').run(params.id);
+      db.prepare('DELETE FROM access_tokens WHERE id = ?').run(params.id);
       return { success: true };
     });
 
@@ -770,14 +771,14 @@ async function buildApp(): Promise<FastifyInstance> {
     
     // Статистика для дашборда
     fastify.get('/api/dashboard', { preHandler: [adminMiddleware] }, async () => {
-      const tables = ['clients', 'requests', 'logs', 'auth_logs', 'refresh_tokens'];
+      const tables = ['clients', 'requests', 'logs', 'auth_logs', 'access_tokens'];
       const stats: Record<string, number> = {};
-      
+
       for (const table of tables) {
         const result = db.prepare(`SELECT COUNT(*) as count FROM ${table}`).get() as { count: number };
         stats[table] = result.count;
       }
-      
+
       // Статус сервера
       return {
         stats,
@@ -788,10 +789,10 @@ async function buildApp(): Promise<FastifyInstance> {
 
     // Выход из админки
     fastify.post('/api/logout', async (request, reply) => {
-      const body = request.body as { refresh_token?: string };
-      if (body.refresh_token) {
+      const body = request.body as { access_token?: string };
+      if (body.access_token) {
         const { authService } = await import('./services/auth.service.js');
-        await authService.logout(body.refresh_token);
+        await authService.logout(body.access_token);
       }
       reply.send({ success: true });
     });

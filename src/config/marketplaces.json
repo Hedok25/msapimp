@@ -22,6 +22,29 @@
         "retryAttempts": 3,
         "retryDelay": 2000
       }
+    },
+    {
+      "id": "statistics-api.wildberries.ru",
+      "name": "WB_API_STATISTICS",
+      "baseUrl": "https://statistics-api.wildberries.rus",
+      "version": "v1",
+      "rateLimits": {
+        "requests": 30,
+        "windowMs": 60000,
+        "burst": 5,
+        "concurrent": 2
+      },
+      "endpoints": {
+        "default": {
+          "url": "",
+          "timeout": 10000
+        }
+      },
+      "defaults": {
+        "timeout": 10000,
+        "retryAttempts": 3,
+        "retryDelay": 2000
+      }
     }
   ]
 }

@@ -11,7 +11,7 @@ export const resources: AdminResource[] = [
   { tableName: 'requests', navigation: { name: 'Запросы', icon: 'List' } },
   { tableName: 'logs', navigation: { name: 'Логи', icon: 'FileText' } },
   { tableName: 'auth_logs', navigation: { name: 'Auth', icon: 'Lock' } },
-  { tableName: 'refresh_tokens', navigation: { name: 'Tokens', icon: 'Key' } },
+  { tableName: 'access_tokens', navigation: { name: 'Tokens', icon: 'Key' } },
   { tableName: 'jwt_blacklist', navigation: { name: 'JWT Blacklist', icon: 'Ban' } },
   { tableName: 'audit_logs', navigation: { name: 'Аудит', icon: 'Shield' } }
 ];
