@@ -1,0 +1,93 @@
+### Тестовые запросы к MP Proxy Service API
+### Для работы установите расширение REST Client в VS Code
+
+@baseUrl = http://localhost:3000
+@adminEmail = admin@mp-proxy.local
+@adminPassword = admin123
+@wbApiKey = ваш_wildberries_api_key
+@msapimpKey = ваш_ключ_микросервиса
+
+# =============================================================================
+# 1. ПОЛУЧЕНИЕ ACCESS ТОКЕНА
+# =============================================================================
+
+### POST /auth/login - Получение токена доступа
+# @name loginRequest
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### Сохраняем токен из ответа
+@accessToken = {{loginRequest.response.body.access_token}}
+
+# =============================================================================
+# 2. ПРОВЕРКА ТЕКУЩЕЙ СЕССИИ
+# =============================================================================
+
+### GET /auth/me - Информация о текущем пользователе
+GET {{baseUrl}}/auth/me
+msapimp-key-api: {{msapimpKey}}
+
+# =============================================================================
+# 3. ЗАПРОСЫ К WILDBERRIES STATISTICS API
+# =============================================================================
+
+### GET /api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/orders
+# Получение данных о заказах продавца
+GET https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom=2026-03-20&flag=0
+Authorization: eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjEsImVudCI6MSwiZXhwIjoxNzg0MDAyOTM5LCJpZCI6IjAxOWJiMzAzLWY0MjYtNzQ0MC04YzI3LWEyZDg4N2U1NTYzYiIsImlpZCI6MjA0MjM3NjkxLCJvaWQiOjg1MzM4LCJzIjo0MTU4LCJzaWQiOiJkYTVjNzMyOS1lMzU0LTU2ODYtOTViYy1kZGZiZDgxNDM1YmMiLCJ0IjpmYWxzZSwidWlkIjoyMDQyMzc2OTF9.2dVW8EApzzdau9ojtIcdjVhRWpUm4bUniBGFZH4g6Kvsw14aoApGBrycHe1bq4dCPZwVYPNr20R1eDf8jYJ9eA
+msapimp-key-api: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbi1jbGllbnQiLCJpc3MiOiJtcC1wcm94eS1zZXJ2aWNlIiwiYXVkIjoibXAtcHJveHktc2VydmljZSIsImlhdCI6MTc3NDY4MTY2NSwiZXhwIjoxNzkwMjMzNjY1LCJqdGkiOiI5NzFiM2FmMS04ODVkLTQxYmItYTlhZi0xYzU2OGZhZjQ0OWIiLCJzY29wZSI6WyJwcm94eTpyZWFkIiwicHJveHk6d3JpdGUiXSwicmF0ZV90aWVyIjoiZW50ZXJwcmlzZSIsInJvbGUiOiJhZG1pbiJ9.WY-4Z4RD3TECSYTZFRYS9_cPpwOO9LY1OhqhrjdNNbs
+
+### GET /api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/products
+# Получение данных о товарах
+GET {{baseUrl}}/api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/products
+msapimp-key-api: {{msapimpKey}}
+
+### GET /api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/stocks
+# Получение данных об остатках на складах
+GET {{baseUrl}}/api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/stocks
+msapimp-key-api: {{msapimpKey}}
+
+### GET /api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/cardorders
+# Получение заказов по карточкам товаров
+GET {{baseUrl}}/api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/cardorders?dateFrom=2024-01-01T00:00:00
+msapimp-key-api: {{msapimpKey}}
+
+### GET /api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/returns
+# Получение данных о возвратах
+GET {{baseUrl}}/api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/returns?dateFrom=2024-01-01T00:00:00
+msapimp-key-api: {{msapimpKey}}
+
+### GET /api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/reports
+# Получение отчётов
+GET {{baseUrl}}/api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/reports?dateFrom=2024-01-01T00:00:00
+msapimp-key-api: {{msapimpKey}}
+
+# =============================================================================
+# 4. ВЫХОД ИЗ СИСТЕМЫ (ОТЗЫВ ТОКЕНА)
+# =============================================================================
+
+### POST /auth/logout - Выход из системы
+POST {{baseUrl}}/auth/logout
+Content-Type: application/json
+
+{
+  "access_token": "{{accessToken}}"
+}
+
+# =============================================================================
+# 5. СЛУЖЕБНЫЕ ЗАПРОСЫ
+# =============================================================================
+
+### GET /api/v1/health - Проверка здоровья сервиса
+GET {{baseUrl}}/api/v1/health
+
+### GET /docs - Swagger документация
+GET {{baseUrl}}/docs
+
+### GET /admin/login - Страница входа в админку
+GET {{baseUrl}}/admin/login

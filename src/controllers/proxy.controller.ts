@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import https from 'https';
 import http from 'http';
+import zlib from 'zlib';
 import { v4 as uuidv4 } from 'uuid';
 import { getDatabase } from '../db/index.js';
 import { dbLogger } from '../logging/index.js';
@@ -12,31 +13,22 @@ export interface ProxyRequestParams {
 }
 
 export async function proxyController(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const params = request.params as unknown as ProxyRequestParams;
+  const params = request.params as unknown as ProxyRequestParams & { '*': string };
   const marketplace = params.marketplace;
-  const pathSegments = params.path || [];
   
+  // Получаем путь из wildcard (*) или из path
+  const pathRaw = params['*'] || params.path || '';
+  const pathString = Array.isArray(pathRaw) ? pathRaw.join('/') : pathRaw;
+
   const req = request as any;
   const requestId = uuidv4();
   const clientId = req.user?.sub || 'anonymous';
-
-  dbLogger.info('Proxy request received', {
-    requestId,
-    clientId,
-    action: 'proxy_request',
-    metadata: {
-      marketplace,
-      path: pathSegments.join('/'),
-      method: request.method,
-      url: request.url
-    }
-  });
 
   try {
     // Парсинг X-Proxy-Options
     let proxyOptions: Partial<ProxyOptions> = {};
     const optionsHeader = request.headers['x-proxy-options'];
-    
+
     if (optionsHeader) {
       try {
         const decoded = Buffer.from(optionsHeader as string, 'base64').toString('utf-8');
@@ -53,14 +45,57 @@ export async function proxyController(request: FastifyRequest, reply: FastifyRep
 
     // Получение конфигурации маркетплейса
     const marketplaceConfig = await getMarketplaceConfig(marketplace);
+
+    // Формирование URL запроса к МП (с query параметрами)
+    const targetPath = pathString.startsWith('/') ? pathString : '/' + pathString;
+    const targetUrl = marketplaceConfig
+      ? new URL(targetPath, marketplaceConfig.baseUrl)
+      : null;
+    
+    // Добавляем query параметры из запроса
+    const originalUrl = new URL(request.url, 'http://localhost');
+    for (const [key, value] of originalUrl.searchParams) {
+      targetUrl?.searchParams.append(key, value);
+    }
+    
+    const targetUrlString = targetUrl?.toString() || `unknown:///${marketplace}${targetPath}`;
+
+    // Логирование запроса с реальным URL
+    dbLogger.info('Proxy request received', {
+      requestId,
+      clientId,
+      action: 'proxy_request',
+      metadata: {
+        marketplace,
+        path: pathString,
+        method: request.method,
+        url: request.url,
+        targetUrl: targetUrlString
+      }
+    });
+
     if (!marketplaceConfig) {
+      dbLogger.error('Marketplace not found', {
+        requestId,
+        clientId,
+        action: 'proxy_failed',
+        errorShort: 'HTTP 404',
+        errorMessage: `HTTP 404: Marketplace "${marketplace}" not found`,
+        metadata: {
+          marketplace,
+          statusCode: 404,
+          method: request.method,
+          targetUrl: targetUrlString,
+          path: pathString
+        }
+      });
+
       reply.code(404).send({ error: 'Not Found', message: `Marketplace "${marketplace}" not found` });
       return;
     }
 
-    // Формирование URL запроса к МП
-    const targetPath = '/' + pathSegments.join('/');
-    const targetUrl = new URL(targetPath, marketplaceConfig.baseUrl);
+    // targetUrl гарантированно не null после проверки marketplaceConfig
+    const finalTargetUrl = targetUrl!;
 
     // Определение таймаута
     const timeout = proxyOptions.timeout_override || marketplaceConfig.defaults.timeout;
@@ -71,8 +106,11 @@ export async function proxyController(request: FastifyRequest, reply: FastifyRep
       INSERT INTO requests (uuid, client_id, marketplace_id, method, url, headers, body, status, priority)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'accepted', ?)
     `);
-    
-    const headersJson = JSON.stringify(request.headers);
+
+    // Фильтрация заголовков перед сохранением (убираем msapimp-key-api)
+    const headersToSave = { ...request.headers };
+    delete headersToSave['msapimp-key-api'];
+    const headersJson = JSON.stringify(headersToSave);
     const bodyString = request.body ? JSON.stringify(request.body) : null;
     
     insertStmt.run(
@@ -80,7 +118,7 @@ export async function proxyController(request: FastifyRequest, reply: FastifyRep
       clientId,
       marketplace,
       request.method,
-      targetUrl.toString(),
+      finalTargetUrl.toString(),
       headersJson,
       bodyString,
       proxyOptions.priority || 'normal'
@@ -91,7 +129,7 @@ export async function proxyController(request: FastifyRequest, reply: FastifyRep
 
     // Выполнение запроса к МП
     const response = await makeRequestToMarketplace({
-      url: targetUrl,
+      url: finalTargetUrl,
       method: request.method as string,
       headers: filterHeaders(request.headers),
       body: request.body ? JSON.stringify(request.body) : undefined,
@@ -113,15 +151,35 @@ export async function proxyController(request: FastifyRequest, reply: FastifyRep
       requestId
     );
 
-    dbLogger.info('Proxy request completed', {
-      requestId,
-      clientId,
-      action: 'proxy_completed',
-      metadata: {
-        marketplace,
-        statusCode: response.statusCode
-      }
-    });
+    if (response.statusCode && response.statusCode >= 400) {
+      const errorBody = response.body ? response.body.substring(0, 500) : 'No response body';
+
+      dbLogger.error('Proxy request failed with error status', {
+        requestId,
+        clientId,
+        action: 'proxy_failed',
+        errorShort: `HTTP ${response.statusCode}`,
+        errorMessage: `HTTP ${response.statusCode}: ${finalTargetUrl.toString()} - ${errorBody}`,
+        metadata: {
+          marketplace,
+          statusCode: response.statusCode,
+          method: request.method,
+          targetUrl: finalTargetUrl.toString(),
+          path: pathString,
+          responseBody: errorBody
+        }
+      });
+    } else {
+      dbLogger.info('Proxy request completed', {
+        requestId,
+        clientId,
+        action: 'proxy_completed',
+        metadata: {
+          marketplace,
+          statusCode: response.statusCode
+        }
+      });
+    }
 
     // Формирование ответа клиенту
     const responseFormat = proxyOptions.response_format || 'wrapped';
@@ -173,25 +231,26 @@ export async function proxyController(request: FastifyRequest, reply: FastifyRep
 
 async function getMarketplaceConfig(marketplaceId: string) {
   try {
-    const configModule = await import('../config/marketplaces.json', { assert: { type: 'json' } });
+    const configModule = await import('../config/marketplaces.json', { with: { type: 'json' } });
     const config = configModule.default as any;
     const mp = config.marketplaces.find((m: { id: string }) => m.id === marketplaceId);
     return mp || null;
   } catch (error) {
+    console.error('Failed to load marketplace config:', error);
     return null;
   }
 }
 
 function filterHeaders(headers: Record<string, unknown>): Record<string, string> {
-  const forbiddenHeaders = ['host', 'content-length', 'connection', 'authorization'];
+  const forbiddenHeaders = ['host', 'content-length', 'connection', 'msapimp-key-api'];
   const filtered: Record<string, string> = {};
-  
+
   for (const [key, value] of Object.entries(headers)) {
     if (!forbiddenHeaders.includes(key.toLowerCase()) && typeof value === 'string') {
       filtered[key] = value;
     }
   }
-  
+
   return filtered;
 }
 
@@ -219,15 +278,23 @@ function makeRequestToMarketplace(options: RequestOptions): Promise<Response> {
       port: options.url.port || (isHttps ? 443 : 80),
       path: options.url.pathname + options.url.search,
       method: options.method,
-      headers: options.headers,
+      headers: {
+        ...options.headers,
+        'Accept-Encoding': 'gzip, deflate'
+      },
       timeout: options.timeout
     };
 
+    // Логирование заголовков запроса (без msapimp-key-api)
+    const headersToLog = { ...options.headers };
+    delete headersToLog['msapimp-key-api'];
+    console.log('📤 Request Headers:', JSON.stringify(headersToLog, null, 2));
+
     const req = lib.request(reqOptions, (res) => {
-      let body = '';
-      
+      let body: Buffer = Buffer.alloc(0);
+
       res.on('data', (chunk) => {
-        body += chunk;
+        body = Buffer.concat([body, chunk]);
       });
 
       res.on('end', () => {
@@ -238,10 +305,23 @@ function makeRequestToMarketplace(options: RequestOptions): Promise<Response> {
           }
         }
 
+        // Обработка gzip/deflate сжатия
+        let bodyString = body.toString('utf8');
+        try {
+          if (headers['content-encoding']?.includes('gzip')) {
+            bodyString = zlib.gunzipSync(body).toString('utf8');
+          } else if (headers['content-encoding']?.includes('deflate')) {
+            bodyString = zlib.inflateSync(body).toString('utf8');
+          }
+        } catch (e) {
+          // Если раскомпрессия не удалась, используем как есть
+          console.log('⚠️ Decompression failed, using raw body');
+        }
+
         resolve({
           statusCode: res.statusCode || 0,
           headers,
-          body
+          body: bodyString
         });
       });
     });

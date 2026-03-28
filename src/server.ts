@@ -25,6 +25,16 @@ async function buildApp(): Promise<FastifyInstance> {
     crossOriginResourcePolicy: false
   });
 
+  // Явная регистрация JSON парсера
+  fastify.addContentTypeParser('application/json', { parseAs: 'string' }, function (req, body, done) {
+    try {
+      const json = JSON.parse(body as string);
+      done(null, json);
+    } catch (error) {
+      done(error as Error, undefined);
+    }
+  });
+
   await fastify.register(fastifyFormbody);
 
   await fastify.register(fastifyRateLimit, {
@@ -152,7 +162,7 @@ async function buildApp(): Promise<FastifyInstance> {
 
         // Check role
         const meRes = await fetch('/auth/me', {
-          headers: { 'Authorization': 'Bearer ' + data.access_token }
+          headers: { 'msapimp-key-api': 'Bearer ' + data.access_token }
         });
         const meData = await meRes.json();
         console.log('User data:', meData);
@@ -178,7 +188,7 @@ async function buildApp(): Promise<FastifyInstance> {
       if (token) {
         try {
           const res = await fetch('/auth/me', {
-            headers: { 'Authorization': 'Bearer ' + token }
+            headers: { 'msapimp-key-api': 'Bearer ' + token }
           });
           if (res.ok) {
             const data = await res.json();
@@ -345,7 +355,7 @@ async function buildApp(): Promise<FastifyInstance> {
     
     async function loadDashboard() {
       const res = await fetch('/admin/api/dashboard', {
-        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
+        headers: { 'msapimp-key-api': 'Bearer ' + localStorage.getItem('access_token') }
       });
       if (!res.ok) { handleAuthError(); return; }
       const data = await res.json();
@@ -366,7 +376,7 @@ async function buildApp(): Promise<FastifyInstance> {
     
     async function loadClients() {
       const res = await fetch('/admin/api/clients', {
-        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
+        headers: { 'msapimp-key-api': 'Bearer ' + localStorage.getItem('access_token') }
       });
       if (!res.ok) { handleAuthError(); return; }
       const data = await res.json();
@@ -401,7 +411,7 @@ async function buildApp(): Promise<FastifyInstance> {
     
     async function loadTokens() {
       const res = await fetch('/admin/api/access_tokens', {
-        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
+        headers: { 'msapimp-key-api': 'Bearer ' + localStorage.getItem('access_token') }
       });
       if (!res.ok) { handleAuthError(); return; }
       const data = await res.json();
@@ -409,13 +419,13 @@ async function buildApp(): Promise<FastifyInstance> {
       let html = \`<div class="card">
         <h3>Access Tokens</h3>
         <table>
-          <thead><tr><th>ID</th><th>Email</th><th>JTI</th><th>Expires At</th><th>Revoked</th><th>Actions</th></tr></thead>
+          <thead><tr><th>ID</th><th>Client ID</th><th>JTI</th><th>Expires At</th><th>Revoked</th><th>Actions</th></tr></thead>
           <tbody>\`;
 
       data.data.forEach(row => {
         html += \`<tr>
           <td>\${row.id}</td>
-          <td>\${row.email}</td>
+          <td>\${row.client_id}</td>
           <td>\${row.jti.substring(0, 8)}...</td>
           <td>\${row.expires_at}</td>
           <td>\${row.is_revoked ? 'Yes' : 'No'}</td>
@@ -432,7 +442,7 @@ async function buildApp(): Promise<FastifyInstance> {
 
     async function loadTable(tableName) {
       const res = await fetch('/admin/api/' + tableName, {
-        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
+        headers: { 'msapimp-key-api': 'Bearer ' + localStorage.getItem('access_token') }
       });
       if (!res.ok) { handleAuthError(); return; }
       const data = await res.json();
@@ -480,7 +490,7 @@ async function buildApp(): Promise<FastifyInstance> {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + localStorage.getItem('access_token')
+            'msapimp-key-api': 'Bearer ' + localStorage.getItem('access_token')
           },
           body: JSON.stringify({ email, password, role, rate_tier: rateTier })
         });
@@ -501,11 +511,11 @@ async function buildApp(): Promise<FastifyInstance> {
     
     async function deleteClient(clientId) {
       if (!confirm('Are you sure you want to delete client: ' + clientId + '?')) return;
-      
+
       try {
         const res = await fetch('/admin/api/clients/' + encodeURIComponent(clientId), {
           method: 'DELETE',
-          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
+          headers: { 'msapimp-key-api': 'Bearer ' + localStorage.getItem('access_token') }
         });
         
         if (!res.ok) throw new Error('Failed to delete');
@@ -522,7 +532,7 @@ async function buildApp(): Promise<FastifyInstance> {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + localStorage.getItem('access_token')
+            'msapimp-key-api': 'Bearer ' + localStorage.getItem('access_token')
           },
           body: JSON.stringify({ is_active: !isActive })
         });
@@ -540,7 +550,7 @@ async function buildApp(): Promise<FastifyInstance> {
       try {
         const res = await fetch('/admin/api/access_tokens/' + tokenId + '/revoke', {
           method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
+          headers: { 'msapimp-key-api': 'Bearer ' + localStorage.getItem('access_token') }
         });
 
         if (!res.ok) throw new Error('Failed to revoke');
@@ -557,7 +567,7 @@ async function buildApp(): Promise<FastifyInstance> {
       try {
         const res = await fetch('/admin/api/access_tokens/' + tokenId + '/delete', {
           method: 'DELETE',
-          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
+          headers: { 'msapimp-key-api': 'Bearer ' + localStorage.getItem('access_token') }
         });
 
         if (!res.ok) throw new Error('Failed to delete');
@@ -592,7 +602,7 @@ async function buildApp(): Promise<FastifyInstance> {
       window.location.href = '/admin/login';
     } else {
       fetch('/auth/me', {
-        headers: { 'Authorization': 'Bearer ' + token }
+        headers: { 'msapimp-key-api': 'Bearer ' + token }
       }).then(res => {
         if (!res.ok) { handleAuthError(); return; }
         return res.json();
@@ -699,39 +709,70 @@ async function buildApp(): Promise<FastifyInstance> {
       return { resources };
     });
 
-    // Получить данные из таблицы
+    // Получить данные из таблицы (исключая access_tokens)
     fastify.get('/api/:table', { preHandler: [adminMiddleware] }, async (request, reply) => {
       const params = request.params as { table: string };
       const query = request.query as { limit?: number; offset?: number };
       const limit = query.limit || 20;
       const offset = query.offset || 0;
-      
+
+      // access_tokens обрабатывается отдельным эндпоинтом
+      if (params.table === 'access_tokens') {
+        return reply.code(400).send({ error: 'Use /api/access_tokens endpoint instead' });
+      }
+
       const resource = resources.find(r => r.tableName === params.table);
       if (!resource) {
         return reply.code(404).send({ error: 'Resource not found' });
       }
-      
+
       const rows = db.prepare(`SELECT * FROM ${params.table} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`).all();
       const count = db.prepare(`SELECT COUNT(*) as count FROM ${params.table}`).get() as { count: number };
-      
+
       return { data: rows, total: count.count };
     });
     
     // Получить запись по ID
     fastify.get('/api/:table/:id', { preHandler: [adminMiddleware] }, async (request, reply) => {
       const params = request.params as { table: string; id: string };
-      
+
       const resource = resources.find(r => r.tableName === params.table);
       if (!resource) {
         return reply.code(404).send({ error: 'Resource not found' });
       }
-      
+
       const row = db.prepare(`SELECT * FROM ${params.table} WHERE id = ?`).get(params.id);
       if (!row) {
         return reply.code(404).send({ error: 'Record not found' });
       }
-      
+
       return { data: row };
+    });
+
+    // Специальный эндпоинт для access_tokens с email клиента
+    fastify.get('/api/access_tokens', { preHandler: [adminMiddleware] }, async (request, reply) => {
+      const query = request.query as { limit?: number; offset?: number };
+      const limit = query.limit || 20;
+      const offset = query.offset || 0;
+
+      const rows = db.prepare(`
+        SELECT 
+          at.id,
+          at.client_id,
+          c.email,
+          at.token_hash,
+          at.jti,
+          at.expires_at,
+          at.is_revoked,
+          at.created_at
+        FROM access_tokens at
+        LEFT JOIN clients c ON at.client_id = c.client_id
+        ORDER BY at.id DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `).all();
+      const count = db.prepare(`SELECT COUNT(*) as count FROM access_tokens`).get() as { count: number };
+
+      return { data: rows, total: count.count };
     });
     
     // Обновить запись

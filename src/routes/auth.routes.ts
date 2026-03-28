@@ -9,7 +9,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     {
       schema: {
         description: 'Получение access токена',
-        tags: ['Authentication'],
+        tags: ['msapimp-key-api'],
         body: {
           type: 'object',
           required: ['email', 'password'],
@@ -39,7 +39,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     {
       schema: {
         description: 'Выход из системы (отзыв access токена)',
-        tags: ['Authentication'],
+        tags: ['msapimp-key-api'],
         body: {
           type: 'object',
           required: ['access_token'],
@@ -47,7 +47,8 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
             access_token: { type: 'string' }
           }
         }
-      }
+      },
+      preHandler: [authMiddleware]
     },
     logoutController
   );
@@ -58,7 +59,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     {
       schema: {
         description: 'Получение информации о текущем пользователе',
-        tags: ['Authentication'],
+        tags: ['msapimp-key-api'],
         security: [{ bearerAuth: [] }],
         response: {
           200: {

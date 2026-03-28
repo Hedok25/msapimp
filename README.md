@@ -718,6 +718,7 @@ services:
 
 **Параметры:**
 - `marketplace` — ID маркетплейса (ozon, wb, yandex...)
+- Заголовок `msapimp-key-api` — API ключ для авторизации в прокси-микросервисе
 - Заголовок `X-Proxy-Options` — Base64-encoded JSON с опциями (опционально)
 
 ---

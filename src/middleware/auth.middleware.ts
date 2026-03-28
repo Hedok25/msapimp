@@ -4,14 +4,20 @@ import config from '../config/index.js';
 import { JwtPayload } from '../types/index.js';
 
 export async function jwtVerifyDecorator(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const authHeader = request.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    reply.code(401).send({ error: 'Unauthorized', message: 'Missing or invalid authorization header' });
+  // Проверяем заголовок msapimp-key-api
+  const apiKeyHeader = (request.headers as any)['msapimp-key-api'] as string | undefined;
+  
+  if (!apiKeyHeader) {
+    reply.code(401).send({ error: 'Unauthorized', message: 'Missing msapimp-key-api header' });
     throw new Error('Unauthorized');
   }
-
-  const token = authHeader.substring(7);
+  
+  let token: string;
+  if (apiKeyHeader.startsWith('Bearer ')) {
+    token = apiKeyHeader.substring(7);
+  } else {
+    token = apiKeyHeader;
+  }
 
   try {
     const parts = token.split('.');

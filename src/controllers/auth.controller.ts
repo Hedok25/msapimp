@@ -37,11 +37,18 @@ export async function loginController(request: FastifyRequest, reply: FastifyRep
 export async function logoutController(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
     const body = logoutSchema.parse(request.body);
+    
+    // Извлекаем client_id из токена для логирования
+    const req = request as any;
+    const user = req.user;
+    const clientId = user?.sub || 'unknown';
+    
     await authService.logout(body.access_token);
 
     dbLogger.info('User logged out', {
+      clientId,
       action: 'logout',
-      metadata: { jti: body.jti }
+      metadata: { jti: body.jti, clientId }
     });
 
     reply.send({ message: 'Logged out successfully' });

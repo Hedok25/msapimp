@@ -26,7 +26,7 @@
     {
       "id": "statistics-api.wildberries.ru",
       "name": "WB_API_STATISTICS",
-      "baseUrl": "https://statistics-api.wildberries.rus",
+      "baseUrl": "https://statistics-api.wildberries.ru",
       "version": "v1",
       "rateLimits": {
         "requests": 30,
