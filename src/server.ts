@@ -11,6 +11,7 @@ import { healthRoutes, proxyRoutes } from './routes/index.js';
 import { resources } from './admin/index.js';
 import logger from './logging/index.js';
 import { adminMiddleware } from './middleware/auth.middleware.js';
+import { queueService } from './services/queue.service.js';
 
 async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -60,9 +61,10 @@ async function buildApp(): Promise<FastifyInstance> {
       components: {
         securitySchemes: {
           bearerAuth: {
-            type: 'http',
-            scheme: 'bearer',
-            bearerFormat: 'JWT'
+            type: 'apiKey',
+            in: 'header',
+            name: 'msapimp-key-api',
+            description: 'JWT токен в заголовке msapimp-key-api (без префикса Bearer)'
           }
         }
       }
@@ -842,10 +844,13 @@ async function buildApp(): Promise<FastifyInstance> {
   // Graceful shutdown
   const shutdown = async () => {
     logger.info('Graceful shutdown initiated...');
-    
+
+    // Остановка worker pool
+    await queueService.stop();
+
     await fastify.close();
     closeDatabase();
-    
+
     logger.info('Server closed');
     process.exit(0);
   };
@@ -863,6 +868,10 @@ async function start() {
     logger.info('Database initialized');
 
     const fastify = await buildApp();
+
+    // Запуск worker pool для обработки очереди
+    queueService.start(4); // 4 воркера по умолчанию
+    logger.info('Queue worker pool started with 4 workers');
 
     await fastify.listen({
       port: config.port,

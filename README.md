@@ -1,8 +1,12 @@
+## Настройка
+Использовать токен для авторизации в микросервисе msapimp
+const MSAPINP_KEY_API = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbi1jbGllbnQiLCJpc3MiOiJtcC1wcm94eS1zZXJ2aWNlIiwiYXVkIjoibXAtcHJveHktc2VydmljZSIsImlhdCI6MTc3NDY4MTY2NSwiZXhwIjoxNzkwMjMzNjY1LCJqdGkiOiI5NzFiM2FmMS04ODVkLTQxYmItYTlhZi0xYzU2OGZhZjQ0OWIiLCJzY29wZSI6WyJwcm94eTpyZWFkIiwicHJveHk6d3JpdGUiXSwicmF0ZV90aWVyIjoiZW50ZXJwcmlzZSIsInJvbGUiOiJhZG1pbiJ9.WY-4Z4RD3TECSYTZFRYS9_cPpwOO9LY1OhqhrjdNNbs"
+
 ## 🎯 Цель проекта
 
 Разработать серверное приложение на **Node.js (TypeScript)** с использованием **SQLite + In-Memory**, выполняющее функцию **прозрачного прокси-сервиса** для маршрутизации запросов к внешним API маркетплейсов (5-10 МП). Сервис должен обеспечивать безопасность, отказоустойчивость, контроль частоты запросов и возможность масштабирования.
 
-Использовать  better‑sqlite3, AdminJS
+Использовать  better‑sqlite3, AdminJS,axois
 Зафиксировать Fastify + @fastify/swagger, @fastify/rate-limit, @fastify/helmet.
 
 ---
@@ -84,7 +88,7 @@
 ### Формат запроса клиента:
 ```
 MP URL:     https://api-seller.ozon.ru/v3/posting/fbs/list
-Proxy URL:  https://proxy-service.com/ozon/v3/posting/fbs/list
+Proxy URL:  https://proxy-service.com/api-seller.ozon.ru/posting/fbs/list
 ```
 
 ### Механика:
@@ -114,7 +118,7 @@ Proxy URL:  https://proxy-service.com/ozon/v3/posting/fbs/list
 ## 📦 4. Управление опциями прокси (X-Proxy-Options)
 
 ### Заголовок:
-- **Имя**: `X-Proxy-Options`
+- **Имя**: `msapimp-options`
 - **Формат**: JSON-объект, закодированный в **Base64**
 - **Лимит**: 1 КБ (декодированный размер)
 
@@ -584,7 +588,6 @@ Admin Panel:
 - [ ] Уведомления (Webhook/Slack) при DLQ и Circuit Breaker
 - [ ] Админ-эндпоинты (управление DLQ, лимитами, CB)
 - [ ] CI/CD pipeline (GitHub Actions)
-- [ ] Docker конфигурация
 
 **Definition of Done:**
 - ✅ Mock-MP работает
@@ -603,34 +606,6 @@ Admin Panel:
 - [ ] Security audit (токены, шифрование, доступы)
 - [ ] Stream-proxy для больших файлов (до 50 МБ)
 
----
-
-## 🐳 17. Docker и CI/CD
-
-### Docker Compose (Development):
-```yaml
-services:
-  proxy:
-    build: .
-    ports: ["3000:3000"]
-    volumes:
-      - .//app/data
-      - ./config:/app/config
-    environment:
-      - NODE_ENV=development
-      - DB_PATH=/app/data/proxy.db
-  
-  mock-mp:
-    build: ./mock-api
-    ports: ["3001:3001"]
-  
-  nginx:
-    image: nginx:alpine
-    ports: ["80:80", "443:443"]
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./ssl:/etc/nginx/ssl
-```
 
 ### CI/CD Pipeline (GitHub Actions):
 | Stage | Задачи |
@@ -719,7 +694,7 @@ services:
 **Параметры:**
 - `marketplace` — ID маркетплейса (ozon, wb, yandex...)
 - Заголовок `msapimp-key-api` — API ключ для авторизации в прокси-микросервисе
-- Заголовок `X-Proxy-Options` — Base64-encoded JSON с опциями (опционально)
+- Заголовок `msapimp-options` — Base64-encoded JSON с опциями (опционально)
 
 ---
 

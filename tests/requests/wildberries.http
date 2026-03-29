@@ -5,7 +5,7 @@
 @adminEmail = admin@mp-proxy.local
 @adminPassword = admin123
 @wbApiKey = ваш_wildberries_api_key
-@msapimpKey = ваш_ключ_микросервиса
+@msapimpKey = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbi1jbGllbnQiLCJpc3MiOiJtcC1wcm94eS1zZXJ2aWNlIiwiYXVkIjoibXAtcHJveHktc2VydmljZSIsImlhdCI6MTc3NDY4MTY2NSwiZXhwIjoxNzkwMjMzNjY1LCJqdGkiOiI5NzFiM2FmMS04ODVkLTQxYmItYTlhZi0xYzU2OGZhZjQ0OWIiLCJzY29wZSI6WyJwcm94eTpyZWFkIiwicHJveHk6d3JpdGUiXSwicmF0ZV90aWVyIjoiZW50ZXJwcmlzZSIsInJvbGUiOiJhZG1pbiJ9.WY-4Z4RD3TECSYTZFRYS9_cPpwOO9LY1OhqhrjdNNbs
 
 # =============================================================================
 # 1. ПОЛУЧЕНИЕ ACCESS ТОКЕНА
@@ -91,3 +91,100 @@ GET {{baseUrl}}/docs
 
 ### GET /admin/login - Страница входа в админку
 GET {{baseUrl}}/admin/login
+
+# =============================================================================
+# 6. ЗАПРОСЫ ОЧЕРЕДИ (Queue Management)
+# =============================================================================
+
+### GET /api/v1/queue/stats - Статистика очереди
+# Получение общей статистики по всем запросам в очереди
+GET {{baseUrl}}/api/v1/queue/stats
+msapimp-key-api: {{msapimpKey}}
+
+### GET /api/v1/queue - Список всех запросов в очереди
+# Получение списка запросов с пагинацией
+GET {{baseUrl}}/api/v1/queue?limit=50&offset=0
+msapimp-key-api: {{msapimpKey}}
+
+### GET /api/v1/queue?status=completed - Фильтрация по статусу
+# Получение только завершённых запросов
+GET {{baseUrl}}/api/v1/queue?status=completed&limit=20
+msapimp-key-api: {{msapimpKey}}
+
+### GET /api/v1/queue?status=processing - Запросы в обработке
+# Получение запросов, которые сейчас обрабатываются
+GET {{baseUrl}}/api/v1/queue?status=processing
+msapimp-key-api: {{msapimpKey}}
+
+### GET /api/v1/queue?status=failed - Ошибочные запросы
+# Получение запросов с ошибками
+GET {{baseUrl}}/api/v1/queue?status=failed
+msapimp-key-api: {{msapimpKey}}
+
+### GET /api/v1/queue/:uuid - Получение запроса по UUID
+# Детальная информация о конкретном запросе в очереди
+GET {{baseUrl}}/api/v1/queue/d87c29af-ce3a-4e91-9c94-e0c25cba4b45
+msapimp-key-api: {{msapimpKey}}
+
+### GET /api/v1/queue/:uuid - Другой пример запроса по UUID
+GET {{baseUrl}}/api/v1/queue/8cb6387d-f0e7-4ac9-9e84-4a425a896028
+msapimp-key-api: {{msapimpKey}}
+
+### DELETE /api/v1/queue/:uuid - Удаление запроса из очереди
+# Удаление конкретного запроса по UUID
+DELETE {{baseUrl}}/api/v1/queue/d87c29af-ce3a-4e91-9c94-e0c25cba4b45
+msapimp-key-api: {{msapimpKey}}
+
+### POST /api/v1/queue/clear - Очистка завершенных запросов
+# Очистка всех завершенных запросов (по умолчанию старше 1 часа)
+POST {{baseUrl}}/api/v1/queue/clear
+Content-Type: application/json
+msapimp-key-api: {{msapimpKey}}
+
+{
+  "olderThan": "2026-03-27T00:00:00.000Z"
+}
+
+### POST /api/v1/queue/clear - Очистка без параметров (по умолчанию 1 час)
+POST {{baseUrl}}/api/v1/queue/clear
+Content-Type: application/json
+msapimp-key-api: {{msapimpKey}}
+
+# =============================================================================
+# 7. АДМИНКА (Admin Panel)
+# =============================================================================
+
+### GET /admin/login - Страница входа в админку
+GET {{baseUrl}}/admin/login
+
+### GET /admin - Панель управления (требуется авторизация)
+GET {{baseUrl}}/admin
+msapimp-key-api: {{msapimpKey}}
+
+### GET /admin/api/dashboard - Статистика дашборда
+GET {{baseUrl}}/admin/api/dashboard
+msapimp-key-api: {{msapimpKey}}
+
+### GET /admin/api/clients - Список клиентов
+GET {{baseUrl}}/admin/api/clients
+msapimp-key-api: {{msapimpKey}}
+
+### GET /admin/api/access_tokens - Список токенов
+GET {{baseUrl}}/admin/api/access_tokens
+msapimp-key-api: {{msapimpKey}}
+
+### GET /admin/api/requests - Список запросов
+GET {{baseUrl}}/admin/api/requests
+msapimp-key-api: {{msapimpKey}}
+
+### GET /admin/api/logs - Логи системы
+GET {{baseUrl}}/admin/api/logs
+msapimp-key-api: {{msapimpKey}}
+
+### GET /admin/api/auth_logs - Логи аутентификации
+GET {{baseUrl}}/admin/api/auth_logs
+msapimp-key-api: {{msapimpKey}}
+
+### GET /admin/api/audit_logs - Аудит логи
+GET {{baseUrl}}/admin/api/audit_logs
+msapimp-key-api: {{msapimpKey}}

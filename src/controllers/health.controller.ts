@@ -50,9 +50,20 @@ export async function healthController(request: FastifyRequest, reply: FastifyRe
 
 export async function getQueueStats(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const db = getDatabase();
-  
+
+  // Инициализируем все статусы нулями
+  const result: Record<string, number> = {
+    accepted: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0,
+    retrying: 0,
+    dead_letter: 0
+  };
+
+  // Получаем реальную статистику
   const stats = db.prepare(`
-    SELECT 
+    SELECT
       status,
       COUNT(*) as count
     FROM requests
@@ -60,7 +71,7 @@ export async function getQueueStats(request: FastifyRequest, reply: FastifyReply
     GROUP BY status
   `).all() as { status: string; count: number }[];
 
-  const result: Record<string, number> = {};
+  // Обновляем реальными значениями
   for (const stat of stats) {
     result[stat.status] = stat.count;
   }
