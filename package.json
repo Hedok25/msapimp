@@ -6,12 +6,16 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc && copy /Y src\\config\\marketplaces.json dist\\config\\ && copy /Y src\\config\\rate_limits.json dist\\config\\ 2>nul",
     "start": "node dist/server.js",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
-    "db:studio": "npx tsx src/db/studio.ts"
+    "db:studio": "npx tsx src/db/studio.ts",
+    
+    "mock:install": "cd mock-api && npm install",
+    "mock:start": "cd mock-api && set MOCK_PORT=3002 && npm start",
+    "mock:dev": "cd mock-api && set MOCK_PORT=3002 && npm run dev"
   },
   "keywords": [
     "proxy",

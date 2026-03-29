@@ -47,6 +47,14 @@ export interface RequestQueue {
   error_message: string | null;
   attempts: number;
   priority: string;
+  
+  // PAGINATION FIELDS
+  group_id: string | null;
+  page_number: number;
+  next_page_url: string | null;
+  is_last_page: number;
+  parent_request_id: string | null;
+  
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -63,6 +71,11 @@ export type RequestStatus =
   | 'rate_limited';
 
 export interface ProxyOptions {
+  // PAGINATION
+  paginate?: boolean;         // Включить пагинацию (по умолчанию true)
+  limit?: number;             // Лимит на страницу (по умолчанию 100)
+  
+  // EXISTING OPTIONS
   check_struct?: boolean;
   logging?: 'minimal' | 'verbose' | 'debug';
   priority?: 'low' | 'normal' | 'high' | 'critical';
@@ -108,3 +121,36 @@ export const RATE_LIMIT_TIERS: Record<string, RateLimitTier> = {
   premium: { requestsPerMin: 100, concurrent: 5, burst: 15 },
   enterprise: { requestsPerMin: 500, concurrent: 20, burst: 50 }
 };
+
+// PAGINATION TYPES
+export type PaginationType = 'page' | 'offset' | 'cursor' | 'auto';
+
+export type RequestGroupStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export interface RequestGroupInfo {
+  id: string;
+  clientId: string;
+  marketplaceId: string;
+  originalUrl: string;
+  originalMethod: string;
+  totalPages?: number;
+  completedPages: number;
+  status: RequestGroupStatus;
+  paginationType?: PaginationType;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface PaginatedResponse {
+  success: boolean;
+  request_group_id: string;
+  status: RequestGroupStatus;
+  total_pages?: number;
+  completed_pages: number;
+  pagination?: {
+    type: PaginationType;
+    current_page?: number;
+    has_more: boolean;
+  };
+  data?: any[];
+}

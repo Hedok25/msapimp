@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { getDatabase } from '../db/index.js';
 import { dbLogger } from '../logging/index.js';
 import { RequestStatus, ProxyOptions } from '../types/index.js';
+import { circuitBreakerManager } from './circuit-breaker.service.js';
 
 export interface QueuedRequest {
   uuid: string;
@@ -393,17 +394,26 @@ export class QueueService {
 
       if (response.status >= 400) {
         dbLogger.warn(`Worker ${workerId} completed request ${request.uuid} with status ${response.status} in ${duration}ms`);
+        
+        // Записываем ошибку в Circuit Breaker
+        circuitBreakerManager.recordFailure(request.marketplace_id, response.status);
       } else {
         dbLogger.info(`Worker ${workerId} completed request ${request.uuid} in ${duration}ms`);
+        
+        // Записываем успех в Circuit Breaker
+        circuitBreakerManager.recordSuccess(request.marketplace_id);
       }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
       dbLogger.error(`Worker ${workerId} failed to process request ${request.uuid}`, {
         errorShort: errorMessage,
         metadata: { uuid: request.uuid }
       });
+
+      // Записываем ошибку в Circuit Breaker
+      circuitBreakerManager.recordFailure(request.marketplace_id);
 
       // Обновляем статус на failed
       await this.updateStatus(request.uuid, 'failed', {

@@ -115,16 +115,18 @@ Proxy URL:  https://proxy-service.com/api-seller.ozon.ru/posting/fbs/list
 
 ---
 
-## 📦 4. Управление опциями прокси (X-Proxy-Options)
+## 📦 4. Управление опциями прокси (msapimp-options)
 
 ### Заголовок:
 - **Имя**: `msapimp-options`
 - **Формат**: JSON-объект, закодированный в **Base64**
 - **Лимит**: 1 КБ (декодированный размер)
 
-### Схема JSON (Zod-валидация):
+### Схема JSON:
 ```json
 {
+  "paginate": "boolean (по умолчанию true)",
+  "limit": "number (лимит на страницу, по умолчанию 100)",
   "check_struct": "boolean",
   "logging": "string (minimal|verbose|debug)",
   "priority": "string (low|normal|high|critical)",
@@ -138,8 +140,42 @@ Proxy URL:  https://proxy-service.com/api-seller.ozon.ru/posting/fbs/list
 }
 ```
 
+### Пример использования:
+
+#### 1. Запрос с пагинацией (по умолчанию)
+```bash
+# Кодируем JSON в Base64
+echo -n '{"paginate":true,"limit":100}' | base64
+# Результат: eyJwYWdpbmF0ZSI6dHJ1ZSwibGltaXQiOjEwMH0=
+
+# Отправляем запрос
+curl -H "Authorization: Bearer <token>" \
+  -H "msapimp-options: eyJwYWdpbmF0ZSI6dHJ1ZSwibGltaXQiOjEwMH0=" \
+  http://localhost:3000/api/v1/proxy/ozon/products
+```
+
+#### 2. Запрос без пагинации (одна страница)
+```bash
+# Кодируем JSON в Base64
+echo -n '{"paginate":false}' | base64
+# Результат: eyJwYWdpbmF0ZSI6ZmFsc2V9
+
+curl -H "Authorization: Bearer <token>" \
+  -H "msapimp-options: eyJwYWdpbmF0ZSI6ZmFsc2V9" \
+  http://localhost:3000/api/v1/proxy/ozon/products
+```
+
+#### 3. Запрос с кастомным лимитом
+```bash
+echo -n '{"paginate":true,"limit":500,"priority":"high"}' | base64
+
+curl -H "Authorization: Bearer <token>" \
+  -H "msapimp-options: <base64>" \
+  http://localhost:3000/api/v1/proxy/ozon/products
+```
+
 ### Приоритет настроек:
-1. **Заголовок X-Proxy-Options** (override)
+1. **Заголовок msapimp-options** (override)
 2. **JWT Claims** `proxy_options`
 3. **Конфиг в БД** (client_id, по умолчанию)
 
@@ -152,13 +188,84 @@ Proxy URL:  https://proxy-service.com/api-seller.ozon.ru/posting/fbs/list
 
 ## 🚦 5. Rate Limiting (Иерархический)
 
-### Уровни:
+### Уровни Rate Limiting (обновлённые):
+💡 Рекомендация: Реализовать кэширование связей client_id → stores → tokens в In-Memory (с TTL 5 мин), чтобы не делать запросы в БД на каждый запрос. Это критично для производительности.
+у каждого МП по свойму определяется store_id: например на озон - в заголовке прописан, на вб - в токене авторизации расшифровать надо
+
 | Уровень | Ключ | Описание |
 |---------|------|----------|
 | Global IP | `ip` | Защита от DoS (1000 запросов/мин) |
-| Client | `client_id:rate_tier` | По тарифу (basic/premium/enterprise) |
-| Marketplace | `client_id:marketplace` | Соблюдение лимитов МП |
-| Endpoint | `client_id:marketplace:endpoint` | Тонкая настройка |
+| Client | `client_id` | По тарифу (basic/premium/enterprise) |
+| Marketplace | `client_id:marketplace` | Суммарно по всем магазинам на МП |
+| Store | `client_id:store_id` | 🔹 Лимит на магазин (клиент может иметь несколько) |
+| Token | `client_id:mp_token_id` | 🔹 Лимит на токен МП (несколько токенов на магазин) |
+| Endpoint | `client_id:store_id:endpoint` | Тонкая настройка на эндпоинт |
+┌─────────────────────────────────────────────────────────────┐
+│                    Запрос получен                           │
+│  Headers: Authorization, X-Proxy-Options                    │
+│  Path: /ozon/v3/analytics/data                              │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  1. Global IP Limit (ip:192.168.1.1)                        │
+│     → Превышен? → 429 Too Many Requests                     │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ ✅
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  2. Client Limit (client:client_1)                          │
+│     → По тарифу (premium: 100/мин)                          │
+│     → Превышен? → 429 + Upgrade suggestion                  │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ ✅
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  3. Marketplace Limit (mp:client_1:ozon)                    │
+│     → Суммарно по всем магазинам на Ozon                    │
+│     → Превышен? → 429 + Retry-After                         │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ ✅
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  4. Store Limit (store:client_1:store_ozon_1)               │
+│     → Лимит на конкретный магазин                           │
+│     → Превышен? → 429 + Store quota exceeded                │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ ✅
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  5. Token Limit (token:client_1:token_ozon_a)               │
+│     → Лимит самого маркетплейса на токен                    │
+│     → Превышен? → 429 от МП (внешний лимит)                 │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ ✅
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│  6. Endpoint Limit (endpoint:client_1:store_ozon_1:/v3/...) │
+│     → Тонкая настройка на тяжёлые эндпоинты                 │
+│     → Превышен? → 429 + Endpoint quota                      │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ ✅
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Запрос разрешён                          │
+│  → Отправка в очередь → Обработка                           │
+└─────────────────────────────────────────────────────────────┘
+### Сущности в БД:
+- `clients` — клиенты с тарифами
+- `stores` — магазины (привязаны к клиенту + МП)
+- `mp_tokens` — токены МП (привязаны к магазину)
+- `rate_limits` — счётчики лимитов (все уровни)
+- `client_mp_limits` — конфигурация лимитов на клиента
+
+### JWT Claims:
+- `sub` — client_id
+- `rate_tier` — тариф
+- `stores` — массив магазинов (или загрузка из БД)
+
+### Приоритет проверки:
+1. Global IP → 2. Client → 3. Marketplace → 4. Store → 5. Token → 6. Endpoint
 
 ### Тарифы (из JWT):
 | Tier | Requests/Min | Concurrent | Burst |
@@ -170,7 +277,126 @@ Proxy URL:  https://proxy-service.com/api-seller.ozon.ru/posting/fbs/list
 ### Хранение:
 - **In-Memory**: быстрая проверка, TTL = окно лимита
 - **SQLite**: аудит, восстановление после рестарта
-- **Синхронизация**: каждые 30 секунд (`INSERT … ON CONFLICT UPDATE`)
+- **Синхронизация**: асинхронная запись при каждом запросе
+
+---
+
+## 🛠️ Rate Limiting API
+
+### Admin Endpoints
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| `GET` | `/api/v1/admin/rate-limits` | Все лимиты системы |
+| `GET` | `/api/v1/admin/rate-limits/:clientId` | Лимиты конкретного клиента |
+| `GET` | `/api/v1/admin/rate-limits/usage` | Текущее использование лимитов |
+| `GET` | `/api/v1/admin/rate-limits/violations` | Лог превышений (429 ошибки) |
+| `GET` | `/api/v1/admin/rate-limits/stats` | Статистика по лимитам |
+| `POST` | `/api/v1/admin/rate-limits/override` | Переопределение лимита |
+| `POST` | `/api/v1/admin/rate-limits/reset` | Сброс счётчика лимита |
+
+### Примеры запросов
+
+#### Получение всех лимитов
+```bash
+curl -H "Authorization: Bearer <admin-token>" \
+  http://localhost:3000/api/v1/admin/rate-limits
+```
+
+#### Переопределение лимита для клиента
+```bash
+curl -X POST \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"level":"client","key":"client_123","requests":200,"window_sec":60}' \
+  http://localhost:3000/api/v1/admin/rate-limits/override
+```
+
+#### Сброс счётчика
+```bash
+curl -X POST \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"key":"client:client_123"}' \
+  http://localhost:3000/api/v1/admin/rate-limits/reset
+```
+
+---
+
+## 📊 Rate Limiting: Заголовки в ответе
+
+### При успешном запросе (2xx)
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1774754100
+X-RateLimit-Level: client
+```
+
+### При превышении лимита (429)
+```
+HTTP/1.1 429 Too Many Requests
+Retry-After: 45
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1774754100
+X-RateLimit-Level: store
+Content-Type: application/json
+
+{
+  "error": {
+    "status": false,
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Store 'Ozon Store 1' rate limit exceeded",
+    "detail": {
+      "level": "store",
+      "store_id": "123"
+    },
+    "retry_after": 45,
+    "limit": 100,
+    "remaining": 0,
+    "reset_at": "2026-03-29T12:35:00.000Z"
+  },
+  "services_info": {
+    "status": false,
+    "created_at": "2026-03-29T12:34:15.000Z",
+    "request_id": "uuid-here"
+  }
+}
+```
+
+---
+
+## 🔔 Алерты при превышениях
+
+Система автоматически отслеживает частые превышения лимитов:
+
+- **Порог**: 10 превышений за час
+- **Действие**: Запись в лог с уровнем `warn`
+- **Хранение**: Таблица `audit_logs` (action: `RATE_LIMIT_VIOLATION`)
+
+### Настройка порогов
+
+В файле `src/services/rate-limit-alert.service.ts`:
+
+```typescript
+private readonly ALERT_THRESHOLD = 10;        // Превышений за час
+private readonly ALERT_WINDOW_MS = 60 * 60 * 1000; // 1 час
+```
+
+### Интеграция с уведомлениями
+
+Для отправки уведомлений (Email, Slack, Telegram) реализуйте метод `sendWebhook` в `RateLimitAlertService`:
+
+```typescript
+private async sendWebhook(data: { clientId: string; violationCount: number }) {
+  // Отправка webhook
+  await fetch('https://your-webhook-url.com/alerts', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+}
+```
 - **Защита от race condition**: `async-mutex` в пределах процесса
 
 ### Ключ лимита:
@@ -531,61 +757,109 @@ Admin Panel:
 
 ## 🛠️ 16. Этапы разработки
 
-### Этап 1: Ядро (1-2 недели)
-- [ ] Базовая структура проекта (TypeScript + ESLint + Prettier)
-- [ ] SQLite инициализация + базовые таблицы
-- [ ] JWT аутентификация (login, refresh, middleware)
-- [ ] Path-based routing (1 маркетплейс, например Ozon)
-- [ ] Простая очередь (in-memory, без persistence)
-- [ ] Health endpoint
+> 📊 **Актуальный статус:** См. файл [STATUS.md](STATUS.md) для подробной информации.
+
+---
+
+### ✅ Этап 1: Ядро (ВЫПОЛНЕН)
+
+**Реализовано:**
+- [x] Базовая структура проекта (TypeScript + ESLint + Prettier)
+- [x] SQLite инициализация + базовые таблицы (8 таблиц)
+- [x] JWT аутентификация (login, logout, me)
+- [x] Path-based routing (универсальный для всех МП)
+- [x] Двухуровневая очередь (in-memory + SQLite)
+- [x] Health endpoint
 
 **Definition of Done:**
-- ✅ JWT auth работает
-- ✅ 1 МП подключён
+- ✅ JWT auth работает (HS256, 180 дней)
+- ✅ Маркетплейсы подключаются через config
 - ✅ Health endpoint возвращает 200
-
----
-
-### Этап 2: Надёжность (1-2 недели)
-- [ ] Rate Limiting (in-memory + SQLite sync)
-- [ ] Retry с экспоненциальной задержкой (base: 2с, max: 5, jitter: ±20%)
-- [ ] Dead Letter Queue (базовая версия)
-- [ ] Circuit Breaker (на 1 МП)
-- [ ] Логирование в SQLite + endpoints для чтения
-- [ ] TTL Cleanup (фоновая задача)
-- [ ] Load test (k6)
-
-**Definition of Done:**
-- ✅ Rate limit блокирует превышения
-- ✅ Retry работает
-- ✅ DLQ записывает ошибки
-- ✅ Circuit Breaker переключает состояния
-
----
-
-### Этап 3: Масштабирование (1-2 недели)
-- [ ] Адаптеры для 3-5 маркетплейсов
-- [ ] Конфигурация эндпоинтов (URL, лимиты, пагинация)
-- [ ] X-Proxy-Options (Base64 JSON)
-- [ ] Двухуровневая очередь (in-memory + SQLite persistence)
-- [ ] Восстановление очереди после рестарта
-- [ ] Graceful Shutdown (SIGTERM + SIGINT)
-- [ ] Hot reload конфигурации
-
-**Definition of Done:**
-- ✅ 5+ МП подключены
 - ✅ Очередь восстанавливается после рестарта
-- ✅ X-Proxy-Options парсится
+
+---
+
+### ✅ Этап 2: Надёжность (ВЫПОЛНЕН)
+
+**Реализовано:**
+- [x] **Rate Limiting** — 6 уровней + алерты при превышениях
+  - Global IP → Client → Marketplace → Store → Token → Endpoint
+  - In-Memory кэш + SQLite персистентность
+  - Заголовки `X-RateLimit-*` в ответе
+  - Admin API для управления лимитами
+- [x] **Circuit Breaker** — 3 состояния (CLOSED/OPEN/HALF-OPEN)
+  - Настраиваемые пороги (failureThreshold, openTimeoutSec)
+  - Автоматическое восстановление
+  - Admin API для мониторинга и сброса
+- [x] **Dead Letter Queue** — автоматическая запись failed запросов
+- [x] **Логирование** — pino + запись в SQLite
+- [x] **TTL Cleanup** — фоновая очистка каждую минуту
+
+**Definition of Done:**
+- ✅ Rate limit блокирует превышения (7 уровней проверки)
+- ✅ Circuit Breaker переключает состояния
+- ✅ DLQ записывает ошибки (таблица requests)
+- ✅ Admin API работает (14 endpoints)
+
+---
+
+### ✅ Этап 3: Масштабирование (ВЫПОЛНЕН)
+
+**Реализовано:**
+- [x] **Пагинация запросов** — автоматическая загрузка всех страниц
+  - Таблица `request_groups` для группировки
+  - Сервис `pagination.service.ts`
+  - Endpoints для получения результатов
+- [x] **msapimp-options** — Base64-encoded JSON (замена X-Proxy-Options)
+  - `paginate: boolean` (по умолчанию true)
+  - `limit: number` (лимит на страницу)
+  - `priority: string` (low/normal/high/critical)
+- [x] **Конфигурация эндпоинтов** — через `config/marketplaces.json`
+- [x] **Восстановление очереди** — после рестарта сервера
+- [x] **Graceful Shutdown** — обработка SIGTERM/SIGINT
+
+**Definition of Done:**
+- ✅ Пагинация работает (GET /api/v1/pagination/groups/:id/results)
+- ✅ msapimp-options парсится (Base64 JSON, 1 КБ лимит)
+- ✅ Очередь восстанавливается после рестарта
 - ✅ Graceful Shutdown отрабатывает
 
 ---
 
-### Этап 4: Продакшен (1-2 недели)
-- [ ] Mock MP API (отдельный сервис)
+### ⏳ Этап 4: Продакшен (В ПРОЦЕССЕ)
+
+**Реализовано:**
+- [x] Swagger документация (`@fastify/swagger-ui`, `/docs`)
+- [x] Админ-эндпоинты (Rate Limits, Circuit Breakers)
+- [x] **Mock MP API** — отдельный сервис для тестирования
+
+**Не реализовано:**
 - [ ] Integration и E2E тесты (покрытие ≥80%)
-- [ ] Swagger документация
 - [ ] Метрики Prometheus + алерты
 - [ ] Уведомления (Webhook/Slack) при DLQ и Circuit Breaker
+- [ ] CI/CD pipeline (GitHub Actions)
+
+**Definition of Done:**
+- ⏳ Mock-MP не реализован
+- ⏳ Тесты не написаны
+- ✅ Swagger сгенерирован (`/docs`)
+- ⏳ Метрики в Prometheus не настроены
+- ✅ Админ-эндпоинты работают (14 endpoints)
+- ⏳ CI/CD пайплайн не настроен
+
+---
+
+### ⏳ Этап 5: Оптимизация (НЕ НАЧАТ)
+
+**Запланировано:**
+- [ ] Профилирование производительности
+- [ ] Оптимизация запросов к SQLite
+- [ ] LRU кэш для GET-запросов (TTL 5 мин)
+- [ ] План перехода на Redis (при >1000 запросов/сек)
+- [ ] Security audit (токены, шифрование, доступы)
+- [ ] Stream-proxy для больших файлов (до 50 МБ)
+
+---
 - [ ] Админ-эндпоинты (управление DLQ, лимитами, CB)
 - [ ] CI/CD pipeline (GitHub Actions)
 
@@ -635,30 +909,27 @@ Admin Panel:
 |-----------|------------|--------|
 | **Аутентификация** | JWT HS256 (dev) / RS256 (prod) | ✅ |
 | **Маршрутизация** | Path-based с виртуальным маппингом | ✅ |
-| **Опции** | X-Proxy-Options (Base64 JSON, 1 КБ лимит) | ✅ |
-| **Rate Limit** | SQLite + async-mutex, синхронизация 30 сек | ✅ |
+| **Опции** | msapimp-options (Base64 JSON, 1 КБ лимит) | ✅ |
+| **Rate Limit** | 6 уровней + алерты, In-Memory + SQLite | ✅ |
 | **Очередь** | 2 уровня, worker-pool, back-pressure | ✅ |
-| **Circuit Breaker** | На МП, шардинг на эндпоинты при росте | ✅ |
-| **DLQ** | Лимит 10000 записей, payload с контекстом | ✅ |
+| **Circuit Breaker** | 3 состояния, Admin API | ✅ |
+| **DLQ** | Автоматическая запись failed запросов | ✅ |
 | **Валидация** | Zod-схемы в адаптерах | ✅ |
-| **Логирование** | Structured, request_id в каждом логе | ✅ |
-| **TTL Cleanup** | Max-batch-size: 1000 записей | ✅ |
-| **Health** | Liveness + Readiness (ready флаг) | ✅ |
+| **Логирование** | Structured (pino), request_id в каждом логе | ✅ |
+| **TTL Cleanup** | Фоновая задача (каждую минуту) | ✅ |
+| **Health** | Liveness + Readiness | ✅ |
 | **Shutdown** | SIGTERM + SIGINT обработчики | ✅ |
-| **Тесты** | Fixture-модуль для Mock-MP | ✅ |
-| **Swagger** | @fastify/swagger + OpenAPI annotations | ✅ |
-| **Конфиг** | marketplaces.json + watcher (SIGHUP) | ✅ |
-| **Таймауты** | 10 сек по умолчанию, override через опции | ✅ |
-| **Файлы** | Stream-proxy до 50 МБ | ✅ |
+| **Swagger** | @fastify/swagger-ui (/docs) | ✅ |
+| **Пагинация** | request_groups, агрегация ответов | ✅ |
+| **Admin API** | Rate Limits + Circuit Breakers (14 endpoints) | ✅ |
+| **Конфиг** | marketplaces.json + rate_limits.json | ✅ |
+| **Таймауты** | 30 сек по умолчанию, override через опции | ✅ |
 | **Лимит тела** | 5 МБ по умолчанию | ✅ |
-| **Версии API** | Версия в пути + адаптер | ✅ |
-| **E2E** | Docker network: testnet | ✅ |
-| **CI/CD** | GitHub Actions pipeline | ✅ |
-| **Docker** | Dockerfile + docker-compose.yml | ✅ |
 | **RBAC** | 2 роли: client, admin | ✅ |
-| **Кэш** | LRU для GET-запросов, TTL 5 мин | ✅ |
-| **Метрики** | Prometheus с лейблами | ✅ |
-| **Load Test** | k6 после Этапа 2 | ✅ |
+| **Метрики** | Prometheus (не реализовано) | ⏳ |
+| **Тесты** | Unit/Integration/E2E (не реализовано) | ⏳ |
+| **CI/CD** | GitHub Actions (не реализовано) | ⏳ |
+| **Mock MP** | Отдельный сервис (реализовано) | ✅ |
 
 ---
 
@@ -758,5 +1029,101 @@ Admin Panel:
 |------|--------|
 | `client` | Прокси, свои запросы, DLQ, queue stats, logs |
 | `admin` | Полный доступ ко всем endpoints + Admin UI |
+
+---
+
+## 🎭 Mock MP API
+
+Для тестирования создан отдельный Mock API сервис, который симулирует ответы маркетплейсов.
+
+### Быстрый старт
+
+```bash
+# Из корневого каталога проекта
+
+# Первый запуск (установка зависимостей)
+npm run mock:install
+
+# Запуск Mock API (порт 3002)
+npm run mock:start
+
+# Запуск в режиме разработки (auto-reload)
+npm run mock:dev
+```
+
+### Устранение ошибок
+
+**Ошибка: Port 3002 is already in use**
+
+```bash
+# Windows - найти процесс
+netstat -ano | findstr :3002
+
+# Остановить процесс (замените <PID> на номер процесса)
+taskkill /PID <PID> /F
+
+# Или использовать другой порт
+set MOCK_PORT=3003 && npm run mock:start
+```
+
+### Endpoints
+
+**Wildberries:**
+- `GET /api/v1/supplier/orders` — Заказы
+- `GET /api/v1/supplier/products` — Товары
+- `GET /api/v1/supplier/stocks` — Остатки
+
+**Ozon:**
+- `POST /v3/posting/fbs/list` — Список заказов
+- `POST /v1/product/list` — Товары
+
+### Сценарии тестирования
+
+```bash
+# Успешный ответ
+curl http://localhost:3002/api/v1/supplier/orders
+
+# Ошибка 429
+curl -H "X-Mock-Scenario: error_429" \
+  http://localhost:3002/api/v1/supplier/orders
+
+# Таймаут
+curl -H "X-Mock-Scenario: timeout" \
+  http://localhost:3002/api/v1/supplier/orders
+```
+
+### Интеграция с MP Proxy
+
+**Вариант 1: Использовать mocktest из marketplaces.json**
+
+```bash
+# Запрос через proxy с использованием mocktest
+curl -H "Authorization: Bearer <token>" \
+  -H "msapimp-options: eyJwYWdpbmF0ZSI6dHJ1ZX0=" \
+  "http://localhost:3000/api/v1/proxy/mocktest/api/v1/supplier/orders"
+```
+
+**Вариант 2: Временная замена baseUrl**
+
+Обновите `config/marketplaces.json` для тестирования:
+
+```json
+{
+  "marketplaces": [
+    {
+      "id": "statistics-api.wildberries.ru",
+      "name": "WB_API_STATISTICS (Mock)",
+      "baseUrl": "http://localhost:3002/api/v1"
+    }
+  ]
+}
+```
+
+📄 **Полная документация:** [mock-api/README.md](mock-api/README.md)
+
+---
+
+> ⚠️ **Mock API не попадает в репозиторий** (добавлен в `.gitignore`).
+> Каждый разработчик запускает локальную копию.
 
 

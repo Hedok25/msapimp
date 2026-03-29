@@ -8,6 +8,16 @@
 @msapimpKey = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbi1jbGllbnQiLCJpc3MiOiJtcC1wcm94eS1zZXJ2aWNlIiwiYXVkIjoibXAtcHJveHktc2VydmljZSIsImlhdCI6MTc3NDY4MTY2NSwiZXhwIjoxNzkwMjMzNjY1LCJqdGkiOiI5NzFiM2FmMS04ODVkLTQxYmItYTlhZi0xYzU2OGZhZjQ0OWIiLCJzY29wZSI6WyJwcm94eTpyZWFkIiwicHJveHk6d3JpdGUiXSwicmF0ZV90aWVyIjoiZW50ZXJwcmlzZSIsInJvbGUiOiJhZG1pbiJ9.WY-4Z4RD3TECSYTZFRYS9_cPpwOO9LY1OhqhrjdNNbs
 
 # =============================================================================
+# 📦 msapimp-options примеры (Base64-encoded JSON)
+# =============================================================================
+# 
+# {"paginate":true} = eyJwYWdpbmF0ZSI6dHJ1ZX0=
+# {"paginate":false} = eyJwYWdpbmF0ZSI6ZmFsc2V9
+# {"paginate":true,"limit":500} = eyJwYWdpbmF0ZSI6dHJ1ZSwibGltaXQiOjUwMH0=
+# {"priority":"high"} = eyJwcmlvcml0eSI6ImhpZ2gifQ==
+# =============================================================================
+
+# =============================================================================
 # 1. ПОЛУЧЕНИЕ ACCESS ТОКЕНА
 # =============================================================================
 
@@ -37,10 +47,27 @@ msapimp-key-api: {{msapimpKey}}
 # =============================================================================
 
 ### GET /api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/orders
-# Получение данных о заказах продавца
+# Получение данных о заказах продавца (с пагинацией, msapimp-options)
+# msapimp-options: {"paginate":true,"limit":100} = eyJwYWdpbmF0ZSI6dHJ1ZSwibGltaXQiOjEwMH0=
 GET https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom=2026-03-20&flag=0
 Authorization: eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjEsImVudCI6MSwiZXhwIjoxNzg0MDAyOTM5LCJpZCI6IjAxOWJiMzAzLWY0MjYtNzQ0MC04YzI3LWEyZDg4N2U1NTYzYiIsImlpZCI6MjA0MjM3NjkxLCJvaWQiOjg1MzM4LCJzIjo0MTU4LCJzaWQiOiJkYTVjNzMyOS1lMzU0LTU2ODYtOTViYy1kZGZiZDgxNDM1YmMiLCJ0IjpmYWxzZSwidWlkIjoyMDQyMzc2OTF9.2dVW8EApzzdau9ojtIcdjVhRWpUm4bUniBGFZH4g6Kvsw14aoApGBrycHe1bq4dCPZwVYPNr20R1eDf8jYJ9eA
 msapimp-key-api: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbi1jbGllbnQiLCJpc3MiOiJtcC1wcm94eS1zZXJ2aWNlIiwiYXVkIjoibXAtcHJveHktc2VydmljZSIsImlhdCI6MTc3NDY4MTY2NSwiZXhwIjoxNzkwMjMzNjY1LCJqdGkiOiI5NzFiM2FmMS04ODVkLTQxYmItYTlhZi0xYzU2OGZhZjQ0OWIiLCJzY29wZSI6WyJwcm94eTpyZWFkIiwicHJveHk6d3JpdGUiXSwicmF0ZV90aWVyIjoiZW50ZXJwcmlzZSIsInJvbGUiOiJhZG1pbiJ9.WY-4Z4RD3TECSYTZFRYS9_cPpwOO9LY1OhqhrjdNNbs
+msapimp-options: eyJwYWdpbmF0ZSI6dHJ1ZSwibGltaXQiOjEwMH0=
+
+### GET /api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/orders
+# Получение данных о заказах (без пагинации, одна страница)
+# msapimp-options: {"paginate":false} = eyJwYWdpbmF0ZSI6ZmFsc2V9
+GET https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom=2026-03-20&flag=0
+Authorization: eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjEsImVudCI6MSwiZXhwIjoxNzg0MDAyOTM5LCJpZCI6IjAxOWJiMzAzLWY0MjYtNzQ0MC04YzI3LWEyZDg4N2U1NTYzYiIsImlpZCI6MjA0MjM3NjkxLCJvaWQiOjg1MzM4LCJzIjo0MTU4LCJzaWQiOiJkYTVjNzMyOS1lMzU0LTU2ODYtOTViYy1kZGZiZDgxNDM1YmMiLCJ0IjpmYWxzZSwidWlkIjoyMDQyMzc2OTF9.2dVW8EApzzdau9ojtIcdjVhRWpUm4bUniBGFZH4g6Kvsw14aoApGBrycHe1bq4dCPZwVYPNr20R1eDf8jYJ9eA
+msapimp-key-api: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbi1jbGllbnQiLCJpc3MiOiJtcC1wcm94eS1zZXJ2aWNlIiwiYXVkIjoibXAtcHJveHktc2VydmljZSIsImlhdCI6MTc3NDY4MTY2NSwiZXhwIjoxNzkwMjMzNjY1LCJqdGkiOiI5NzFiM2FmMS04ODVkLTQxYmItYTlhZi0xYzU2OGZhZjQ0OWIiLCJzY29wZSI6WyJwcm94eTpyZWFkIiwicHJveHk6d3JpdGUiXSwicmF0ZV90aWVyIjoiZW50ZXJwcmlzZSIsInJvbGUiOiJhZG1pbiJ9.WY-4Z4RD3TECSYTZFRYS9_cPpwOO9LY1OhqhrjdNNbs
+msapimp-options: eyJwYWdpbmF0ZSI6ZmFsc2V9
+
+### GET /api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/products
+# Получение данных о товарах (с высоким приоритетом)
+# msapimp-options: {"priority":"high"} = eyJwcmlvcml0eSI6ImhpZ2gifQ==
+GET {{baseUrl}}/api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/products
+msapimp-key-api: {{msapimpKey}}
+msapimp-options: eyJwcmlvcml0eSI6ImhpZ2gifQ==
 
 ### GET /api/v1/proxy/statistics-api.wildberries.ru/api/v1/supplier/products
 # Получение данных о товарах

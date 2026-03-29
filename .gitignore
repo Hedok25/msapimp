@@ -11,3 +11,7 @@ coverage
 *.swo
 .DS_Store
 .gitignore
+
+# Mock API (не попадает в репозиторий)
+mock-api/
+!mock-api/README.md

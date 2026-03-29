@@ -3,6 +3,7 @@ import { healthController, getQueueStats, getLogs, clearLogs } from '../controll
 import { proxyController } from '../controllers/proxy.controller.js';
 import { getQueueStatsController, getRequestController, deleteRequestController, clearQueueController } from '../controllers/queue.controller.js';
 import { authMiddleware, adminMiddleware } from '../middleware/auth.middleware.js';
+import { rateLimitMiddleware } from '../middleware/rate-limit.middleware.js';
 
 export async function healthRoutes(fastify: FastifyInstance): Promise<void> {
   // Тестовый маршрут
@@ -265,11 +266,15 @@ export async function proxyRoutes(fastify: FastifyInstance): Promise<void> {
             'x-proxy-options': {
               type: 'string',
               description: 'Base64-encoded JSON с опциями проксирования'
+            },
+            'x-store-id': {
+              type: 'string',
+              description: 'ID магазина (stores.id)'
             }
           }
         }
       },
-      preHandler: [authMiddleware]
+      preHandler: [authMiddleware, rateLimitMiddleware]
     },
     proxyController
   );

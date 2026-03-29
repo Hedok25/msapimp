@@ -99,6 +99,14 @@ export async function initDatabase(): Promise<void> {
       error_message TEXT,
       attempts INTEGER DEFAULT 0,
       priority TEXT DEFAULT 'normal',
+      
+      -- PAGINATION FIELDS
+      group_id TEXT,                    -- Группа запросов (для пагинации)
+      page_number INTEGER DEFAULT 1,    -- Номер страницы
+      next_page_url TEXT,               -- URL следующей страницы
+      is_last_page INTEGER DEFAULT 0,   -- Последняя ли страница
+      parent_request_id TEXT,           -- Ссылка на родительский запрос
+      
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       completed_at DATETIME
@@ -134,6 +142,158 @@ export async function initDatabase(): Promise<void> {
       ip_address TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
+  `);
+
+  // RATE LIMITING TABLES
+
+  // Таблица магазинов (stores)
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS stores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id TEXT NOT NULL,
+      marketplace_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      external_store_id TEXT,
+      settings TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(client_id, marketplace_id, external_store_id)
+    )
+  `);
+
+  // Таблица токенов маркетплейсов (mp_tokens)
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS mp_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      store_id INTEGER NOT NULL,
+      marketplace_id TEXT NOT NULL,
+      token_hash TEXT NOT NULL,
+      token_encrypted TEXT,
+      token_prefix TEXT,
+      expires_at DATETIME,
+      refresh_token_encrypted TEXT,
+      is_active INTEGER DEFAULT 1,
+      is_primary INTEGER DEFAULT 0,
+      rate_limit_override INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_used_at DATETIME,
+      FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Таблица конфигурации лимитов (rate_limit_configs)
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS rate_limit_configs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      level TEXT NOT NULL,
+      key TEXT NOT NULL,
+      requests INTEGER NOT NULL,
+      window_sec INTEGER NOT NULL,
+      burst INTEGER,
+      concurrent INTEGER,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(level, key)
+    )
+  `);
+
+  // Таблица лимитов клиента на маркетплейс (client_mp_limits)
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS client_mp_limits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id TEXT NOT NULL,
+      marketplace_id TEXT NOT NULL,
+      custom_requests INTEGER,
+      custom_window_sec INTEGER,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(client_id, marketplace_id)
+    )
+  `);
+
+  // Таблица счётчиков rate limits (rate_limit_counters)
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS rate_limit_counters (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT UNIQUE NOT NULL,
+      count INTEGER DEFAULT 0,
+      window_start DATETIME NOT NULL,
+      window_end DATETIME NOT NULL,
+      last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Индексы для rate limiting
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_stores_client ON stores(client_id);
+    CREATE INDEX IF NOT EXISTS idx_stores_marketplace ON stores(marketplace_id);
+    CREATE INDEX IF NOT EXISTS idx_stores_active ON stores(is_active);
+    CREATE INDEX IF NOT EXISTS idx_mp_tokens_store ON mp_tokens(store_id);
+    CREATE INDEX IF NOT EXISTS idx_mp_tokens_active ON mp_tokens(is_active, marketplace_id);
+    CREATE INDEX IF NOT EXISTS idx_rate_limits_level ON rate_limit_configs(level, key);
+    CREATE INDEX IF NOT EXISTS idx_client_mp_limits ON client_mp_limits(client_id, marketplace_id);
+    CREATE INDEX IF NOT EXISTS idx_rate_limit_counters_key ON rate_limit_counters(key);
+    CREATE INDEX IF NOT EXISTS idx_rate_limit_counters_window ON rate_limit_counters(window_end);
+  `);
+
+  // CIRCUIT BREAKER TABLES
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS circuit_breaker_configs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      marketplace_id TEXT UNIQUE NOT NULL,
+      config_json TEXT NOT NULL,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS circuit_breaker_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      marketplace_id TEXT UNIQUE NOT NULL,
+      state TEXT NOT NULL,
+      failures INTEGER DEFAULT 0,
+      successes INTEGER DEFAULT 0,
+      opened_at DATETIME,
+      last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_cb_configs_marketplace ON circuit_breaker_configs(marketplace_id);
+    CREATE INDEX IF NOT EXISTS idx_cb_stats_marketplace ON circuit_breaker_stats(marketplace_id);
+  `);
+
+  // PAGINATION TABLES
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS request_groups (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL,
+      marketplace_id TEXT NOT NULL,
+      original_url TEXT NOT NULL,
+      original_method TEXT NOT NULL,
+      total_pages INTEGER,
+      completed_pages INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      pagination_type TEXT,
+      pagination_config TEXT,
+      error_message TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      completed_at DATETIME
+    )
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_request_groups_client ON request_groups(client_id);
+    CREATE INDEX IF NOT EXISTS idx_request_groups_status ON request_groups(status);
+    CREATE INDEX IF NOT EXISTS idx_request_groups_created ON request_groups(created_at);
+    CREATE INDEX IF NOT EXISTS idx_requests_group ON requests(group_id);
+    CREATE INDEX IF NOT EXISTS idx_requests_page ON requests(group_id, page_number);
   `);
 
   // Индексы для производительности

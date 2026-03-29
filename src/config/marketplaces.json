@@ -45,6 +45,37 @@
         "retryAttempts": 3,
         "retryDelay": 2000
       }
+    },
+    {
+      "id": "mocktest",
+      "name": "Mock Test API (Local)",
+      "baseUrl": "http://localhost:3002",
+      "version": "v1",
+      "rateLimits": {
+        "requests": 1000,
+        "windowMs": 60000,
+        "burst": 100,
+        "concurrent": 10
+      },
+      "endpoints": {
+        "default": {
+          "url": "",
+          "timeout": 30000
+        },
+        "wildberries": {
+          "url": "/api/v1/supplier",
+          "timeout": 30000
+        },
+        "ozon": {
+          "url": "/v3",
+          "timeout": 30000
+        }
+      },
+      "defaults": {
+        "timeout": 30000,
+        "retryAttempts": 1,
+        "retryDelay": 1000
+      }
     }
   ]
 }

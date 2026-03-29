@@ -1,0 +1,68 @@
+{
+  "tiers": {
+    "basic": {
+      "requests": 30,
+      "window_sec": 60,
+      "burst": 5,
+      "concurrent": 2
+    },
+    "premium": {
+      "requests": 100,
+      "window_sec": 60,
+      "burst": 15,
+      "concurrent": 5
+    },
+    "enterprise": {
+      "requests": 500,
+      "window_sec": 60,
+      "burst": 50,
+      "concurrent": 20
+    }
+  },
+  "global": {
+    "ip": {
+      "requests": 1000,
+      "window_sec": 60
+    }
+  },
+  "marketplaces": {
+    "ozon": {
+      "default": {
+        "requests": 100,
+        "window_sec": 60
+      },
+      "endpoints": {
+        "/api/v1/posting/fbs/list": {
+          "requests": 20,
+          "window_sec": 60
+        },
+        "/api/v1/product/info": {
+          "requests": 50,
+          "window_sec": 60
+        }
+      }
+    },
+    "wildberries": {
+      "default": {
+        "requests": 100,
+        "window_sec": 60
+      },
+      "endpoints": {
+        "/api/v1/supplier/orders": {
+          "requests": 20,
+          "window_sec": 60
+        },
+        "/api/v1/supplier/products": {
+          "requests": 50,
+          "window_sec": 60
+        }
+      }
+    },
+    "yandex": {
+      "default": {
+        "requests": 100,
+        "window_sec": 60
+      }
+    }
+  }
+}

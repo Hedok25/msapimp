@@ -8,10 +8,16 @@ import { initDatabase, closeDatabase } from './db/index.js';
 import config from './config/index.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { healthRoutes, proxyRoutes } from './routes/index.js';
+import { adminRateLimitRoutes } from './routes/admin/rate-limit.routes.js';
+import { adminCircuitBreakerRoutes } from './routes/admin/circuit-breaker.routes.js';
+import { paginationRoutes } from './routes/pagination.routes.js';
 import { resources } from './admin/index.js';
 import logger from './logging/index.js';
 import { adminMiddleware } from './middleware/auth.middleware.js';
 import { queueService } from './services/queue.service.js';
+import { rateLimitService } from './services/rate-limit.service.js';
+import { rateLimitAlertService } from './services/rate-limit-alert.service.js';
+import { circuitBreakerManager } from './services/circuit-breaker.service.js';
 
 async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -83,6 +89,15 @@ async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(authRoutes, { prefix: '/auth' });
   await fastify.register(healthRoutes, { prefix: '/api/v1' });
   await fastify.register(proxyRoutes, { prefix: '/api/v1/proxy' });
+
+  // Admin Rate Limits API
+  await fastify.register(adminRateLimitRoutes, { prefix: '/api/v1/admin' });
+
+  // Admin Circuit Breakers API
+  await fastify.register(adminCircuitBreakerRoutes, { prefix: '/api/v1/admin' });
+
+  // Pagination API
+  await fastify.register(paginationRoutes, { prefix: '/api/v1' });
 
   // AdminJS REST API для работы с данными + UI
   await fastify.register(async (fastify) => {
@@ -872,6 +887,12 @@ async function start() {
     // Запуск worker pool для обработки очереди
     queueService.start(4); // 4 воркера по умолчанию
     logger.info('Queue worker pool started with 4 workers');
+
+    // Запуск фоновых задач rate limiting
+    rateLimitService.startCacheCleanup();
+    rateLimitAlertService.startCleanup();
+    circuitBreakerManager.startCleanup();
+    logger.info('Rate limit services started');
 
     await fastify.listen({
       port: config.port,
