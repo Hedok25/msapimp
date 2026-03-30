@@ -1136,18 +1136,23 @@ npm run strip
 - Mock-скрипты: `mock:install`, `mock:start`, `mock:dev`
 - Копирование конфигов из `build`: остаётся просто `tsc`
 
-**Для локальной сборки используйте:**
+**Для локальной сборки:**
 ```bash
-npm run build:local
+# Полная сборка с копированием конфигов
+npm run build:full
+
+# Или по отдельности
+npm run build        # Только компиляция TypeScript
+npm run build:copy-config  # Только копирование конфигов
 ```
 
 **Для деплоя на Amvera:**
-- `amvera.yml` автоматически копирует конфиги после `npm run build`
+- `amvera.yml` автоматически выполняет `npm run build` + `npm run build:copy-config`
 - В репозиторий загружается «чистый» `package.json`
 
 После очистки:
 ```bash
-git add package.json
+git add .
 git commit -m "ваше сообщение"
 ```
 
