@@ -3,17 +3,19 @@ meta:
   environment: node
   toolchain:
     name: npm
-    version: 22
+    version: "22"
 build:
   skip: false
-  additionalCommands: npm run build
+  commands:
+    - npm run build
+    - npm run build:copy-config
   artifacts:
-    '*': /
+    "*": /
 run:
   persistenceMount: /data
   scriptName: null
   scriptArguments: null
   nodeArguments: null
   command: npm start
-  containerPort: 80
-  servicePort: 80
+  containerPort: "80"
+  servicePort: "80"
