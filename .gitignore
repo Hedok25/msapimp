@@ -1,17 +1,36 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables
 .env
-*.db
+.env.local
+
+# Logs
+logs/
 *.log
-data/
-coverage
-.vscode
-.idea
+pino.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Mock API (локальная разработка)
+mock-api/node_modules/
+
+# IDE
+.idea/
+.vscode/
 *.swp
 *.swo
-.DS_Store
-.gitignore
 
-# Mock API (не попадает в репозиторий)
-mock-api/
-!mock-api/README.md
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/

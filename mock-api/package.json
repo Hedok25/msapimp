@@ -1,0 +1,18 @@
+{
+  "name": "mp-mock-api",
+  "version": "1.0.0",
+  "description": "Mock API для тестирования MP Proxy Service",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "keywords": ["mock", "marketplace", "test"],
+  "author": "",
+  "license": "MIT"
+}
