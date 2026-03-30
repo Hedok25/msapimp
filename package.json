@@ -13,7 +13,8 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "db:studio": "npx tsx src/db/studio.ts",
     "strip": "node scripts/strip-package.js",
-    "precommit": "npm run strip"
+    "precommit": "npm run strip",
+    "build:local": "tsc && copy /Y src\\config\\marketplaces.json dist\\config\\ && copy /Y src\\config\\rate_limits.json dist\\config\\ 2>nul"
   },
   "keywords": [
     "proxy",
