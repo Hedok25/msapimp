@@ -292,8 +292,6 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_request_groups_client ON request_groups(client_id);
     CREATE INDEX IF NOT EXISTS idx_request_groups_status ON request_groups(status);
     CREATE INDEX IF NOT EXISTS idx_request_groups_created ON request_groups(created_at);
-    CREATE INDEX IF NOT EXISTS idx_requests_group ON requests(group_id);
-    CREATE INDEX IF NOT EXISTS idx_requests_page ON requests(group_id, page_number);
   `);
 
   // Индексы для производительности
@@ -309,6 +307,32 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_access_tokens_jti ON access_tokens(jti);
     CREATE INDEX IF NOT EXISTS idx_jwt_blacklist_jti ON jwt_blacklist(jti);
     CREATE INDEX IF NOT EXISTS idx_auth_logs_created_at ON auth_logs(created_at);
+  `);
+
+  // МИГРАЦИИ: Добавляем новые поля в существующие таблицы
+  // Поле group_id может уже существовать, поэтому используем ALTER TABLE с проверкой
+  try {
+    database.exec(`ALTER TABLE requests ADD COLUMN group_id TEXT`);
+  } catch (e) {
+    // Игнорируем ошибку, если колонка уже существует
+  }
+  try {
+    database.exec(`ALTER TABLE requests ADD COLUMN page_number INTEGER DEFAULT 1`);
+  } catch (e) {}
+  try {
+    database.exec(`ALTER TABLE requests ADD COLUMN next_page_url TEXT`);
+  } catch (e) {}
+  try {
+    database.exec(`ALTER TABLE requests ADD COLUMN is_last_page INTEGER DEFAULT 0`);
+  } catch (e) {}
+  try {
+    database.exec(`ALTER TABLE requests ADD COLUMN parent_request_id TEXT`);
+  } catch (e) {}
+
+  // Создаём индексы для новых полей
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_requests_group ON requests(group_id);
+    CREATE INDEX IF NOT EXISTS idx_requests_page ON requests(group_id, page_number);
   `);
 
   // Создаем админа по умолчанию
