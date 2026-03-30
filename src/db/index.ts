@@ -310,24 +310,25 @@ export async function initDatabase(): Promise<void> {
   `);
 
   // МИГРАЦИИ: Добавляем новые поля в существующие таблицы
-  // Поле group_id может уже существовать, поэтому используем ALTER TABLE с проверкой
-  try {
+  // Проверяем существование колонок перед добавлением
+  const tableInfo = database.pragma("table_info('requests')") as Array<{ name: string }>;
+  const columnNames = tableInfo.map(col => col.name);
+
+  if (!columnNames.includes('group_id')) {
     database.exec(`ALTER TABLE requests ADD COLUMN group_id TEXT`);
-  } catch (e) {
-    // Игнорируем ошибку, если колонка уже существует
   }
-  try {
+  if (!columnNames.includes('page_number')) {
     database.exec(`ALTER TABLE requests ADD COLUMN page_number INTEGER DEFAULT 1`);
-  } catch (e) {}
-  try {
+  }
+  if (!columnNames.includes('next_page_url')) {
     database.exec(`ALTER TABLE requests ADD COLUMN next_page_url TEXT`);
-  } catch (e) {}
-  try {
+  }
+  if (!columnNames.includes('is_last_page')) {
     database.exec(`ALTER TABLE requests ADD COLUMN is_last_page INTEGER DEFAULT 0`);
-  } catch (e) {}
-  try {
+  }
+  if (!columnNames.includes('parent_request_id')) {
     database.exec(`ALTER TABLE requests ADD COLUMN parent_request_id TEXT`);
-  } catch (e) {}
+  }
 
   // Создаём индексы для новых полей
   database.exec(`
