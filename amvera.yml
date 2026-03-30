@@ -6,9 +6,7 @@ meta:
     version: "22"
 build:
   skip: false
-  commands:
-    - npm run build
-    - npm run build:copy-config
+  additionalCommands: npm run build && npm run build:copy-config
   artifacts:
     "*": /
 run:
