@@ -6,7 +6,7 @@ meta:
     version: "22"
 build:
   skip: false
-  additionalCommands: npm run build && npm run build:copy-config
+  additionalCommands: npm run build && mkdir -p dist/config && cp src/config/marketplaces.json dist/config/ && cp src/config/rate_limits.json dist/config/
   artifacts:
     "*": /
 run:
