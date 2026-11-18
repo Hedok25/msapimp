@@ -60,6 +60,10 @@ async function buildApp(): Promise<FastifyInstance> {
       },
       servers: [
         {
+          url: 'http://msapimp-diakonov.msk1.amvera.tech',
+          description: 'Production server'
+        },
+        {
           url: 'http://localhost:3000',
           description: 'Development server'
         }
